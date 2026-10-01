@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build output
+app/target/
+app/dist/
+app/release/
+app/src-tauri/gen/schemas/
+
+# Local / editor
+*.log
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,60 @@
+[package]
+name = "winsle"
+description = "Winsle for Windows — Mochi lives at the top of your screen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "winsle_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Same versions Tauri already pulls in: used only to set WebView2's memory target.
+webview2-com = "0.39"
+windows-core-62 = { package = "windows-core", version = "0.62" }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+tokio = { version = "1", features = ["net", "io-util", "sync", "time", "rt"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+base64 = "0.22"
+keyring = { version = "3", features = ["windows-native"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+windows = { version = "0.61", features = [
+  "Win32_System_Registry",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Com",
+  "Storage_Streams",
+  "Foundation",
+  "Media_Control",
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Security_Authorization",
+  "Win32_System_Ole",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_UI_Shell",
+  "Win32_System_Time",
+  "Win32_System_Power",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_Networking_NetworkListManager",
+  "Win32_Media_Audio",
+  "Win32_Media_Audio_Endpoints",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Variant",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_ProcessStatus",
+  "Win32_Storage_FileSystem",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_NetworkManagement_Ndis",
+  "Win32_Networking_WinSock",
+] }

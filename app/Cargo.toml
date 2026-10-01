@@ -1,0 +1,18 @@
+[workspace]
+members = ["src-tauri", "hook"]
+resolver = "2"
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+license = "MIT"
+
+# Release profile shared by the app and the hook relay: the hook must start fast
+# (ai-assistant Code spawns it on every event), so we optimise for size and speed.
+[profile.release]
+opt-level = "s"
+# Thin LTO: full LTO needs several GB and stalls for 30+ min on a loaded 16 GB machine.
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true

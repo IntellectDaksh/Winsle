@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What Winsle's windows are allowed to do. Everything that touches the OS goes through Winsle's own commands.",
+  "windows": ["island", "settings"],
+  "permissions": ["core:default", "autostart:default"]
+}
