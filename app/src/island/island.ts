@@ -2,7 +2,7 @@
 // Mirrors IslandRootView.swift + IslandWindowController.swift.
 
 import { Tracked, Spring, clamp } from "../core/anim";
-import { Bridge, IS_TAURI, onDragDrop } from "../core/bridge";
+import { Bridge, IS_TAURI, onDragDrop, onEvent } from "../core/bridge";
 import {
   EXPANDED_CORNER, EXPANDED_W, NOTCH_W, PANEL_H, PANEL_W,
   ROUNDED_CORNER, VIEW_LAYOUTS, botGlowColor, botGlowOpacity, botPosition, chatPromptHeight,
@@ -21,6 +21,7 @@ import { h } from "../views/dom";
 import { IslandStateMachine } from "./fsm";
 import { CompactLive } from "../live/compact";
 import { Live } from "../live/store";
+import { save } from "../live/prefs";
 import { TEXT_VIEWS } from "../live/views";
 import { IDLE_DIM_MS, IdleLine } from "../live/idle";
 
@@ -62,6 +63,7 @@ export class Island {
   private compactLive = new CompactLive();
   /** Compact island is in its wide form, showing a live activity. */
   private liveWide = false;
+  private liveW = 0;
   private idleLine = new IdleLine();
   private dimTimer: number | null = null;
   private idleTicks = 0;
@@ -157,7 +159,7 @@ export class Island {
           integration_notion: "https://notion.so",
           integration_calcom: "https://app.cal.com/bookings",
         };
-        if (task.id === "integration_ai-assistant") void Bridge.openInVSCode(task.sessionCwd ?? null);
+        if (task.id === "integration_ai_assistant") void Bridge.openInVSCode(task.sessionCwd ?? null);
         else if (task.id === "integration_n8n") void Bridge.openN8n();
         else if (urls[task.id]) void Bridge.openUrl(urls[task.id]);
       },
@@ -173,8 +175,8 @@ export class Island {
         State.pendingApproval = null;
         State.isPinned = false;
         this.fsm.pinned = false;
-        State.updateTask("integration_ai-assistant", "working");
-        State.setPillBadge("integration_ai-assistant", null);
+        State.updateTask("integration_ai_assistant", "working");
+        State.setPillBadge("integration_ai_assistant", null);
         this.setView(State.defaultView());
       },
       toggleSound: () => {
@@ -285,6 +287,32 @@ export class Island {
 
   launch() {
     this.fsm.launch();
+    window.addEventListener("winsle-lock", () => this.setLocked(!Live.locked));
+    void onEvent<null>("hotkey-lock", () => this.setLocked(!Live.locked));
+    void onEvent<null>("hotkey-palette", () => {
+      if (State.paused) return;
+      if (State.mode === "expanded" && State.view === "palette") this.collapse();
+      else this.alert("palette");
+    });
+    if (Live.locked) this.setLocked(true, true);
+  }
+
+  /** Ghost mode: ~38 % opacity, clicks pass straight through, no hover-open. */
+  setLocked(on: boolean, quiet = false) {
+    Live.locked = on;
+    save("locked", on);
+    void Bridge.setLocked(on);
+    this.cancelHoverOpen();
+    if (on && State.mode === "expanded") this.collapse();
+    if (!quiet) {
+      Sound.play(on ? "close" : "open");
+      Live.setFlash({
+        icon: "lock", color: on ? "#94A3B8" : "#34D399",
+        title: on ? "Island locked" : "Island unlocked",
+        sub: on ? "Click-through · Ctrl+Alt+L to unlock" : "", view: "overview",
+      }, 1800);
+    }
+    State.notify();
   }
 
   // ── Mode / view ─────────────────────────────────────────────────────────────
@@ -358,6 +386,12 @@ export class Island {
 
   /** Alert from the hook server: open on this view. Pinned alerts never auto-close. */
   alert(view: IslandViewName) {
+    if (Live.locked) {
+      // Ghost mode: automatic openings stay quiet; anything that needs a click
+      // (an approval, a question) or that you asked for by hotkey unlocks it.
+      if (view === "timer" || view === "calendar" || view === "dev") return;
+      this.setLocked(false);
+    }
     this.fsm.pinned = State.isPinned;
     this.fsm.forceHome();
     this.expand(view);
@@ -483,7 +517,7 @@ export class Island {
   // ── Geometry ────────────────────────────────────────────────────────────────
 
   private targetSize(): { w: number; h: number; r: number } {
-    const { w, h } = islandSize(State.mode, State.view, State.chatHistory.length, this.liveWide);
+    const { w, h } = islandSize(State.mode, State.view, State.chatHistory.length, this.liveWide ? this.liveW : 0);
     // Compact reads as a capsule hanging from the top edge, not a tab.
     const r = State.mode === "expanded" ? EXPANDED_CORNER : State.mode === "compact" ? 18 : ROUNDED_CORNER;
     return { w, h, r };
@@ -561,6 +595,7 @@ export class Island {
   private wireInput() {
     // The wake strip is the only thing the OS can hit while the island is hidden.
     this.wakeStrip.addEventListener("mouseenter", () => {
+      if (Live.locked) return;
       Sound.resume();
       if (State.mode === "hidden") this.fsm.mouseEntered();
     });
@@ -613,6 +648,12 @@ export class Island {
   /** Cursor in window-logical coordinates. */
   onCursor(x: number, y: number) {
     State.mouse = { x, y };
+    if (Live.locked) {
+      // Mochi's eyes still follow the cursor; nothing else reacts.
+      this.wasInIsland = false;
+      this.ensureRunning();
+      return;
+    }
     const rect = this.islandRect();
     State.mouseInIsland = { x: x - rect.x, y: y - rect.y };
 
@@ -932,11 +973,15 @@ export class Island {
     }
 
     // Live activity in the compact island: widen it while there is one.
-    const wide = this.compactLive.sync(State.mode === "compact");
-    if (wide !== this.liveWide) {
+    const liveW = this.compactLive.sync(State.mode === "compact");
+    const wide = liveW > 0;
+    if (wide !== this.liveWide || (wide && liveW !== this.liveW)) {
+      const shrinking = !wide || liveW < this.liveW;
       this.liveWide = wide;
-      if (State.mode === "compact") this.animateGeometry(!wide);
+      this.liveW = liveW;
+      if (State.mode === "compact") this.animateGeometry(shrinking);
     }
+    this.islandEl.classList.toggle("locked", Live.locked);
     this.compactLive.dots.dataset.mode = State.mode;
 
     // Compact mini grid

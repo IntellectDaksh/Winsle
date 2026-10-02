@@ -100,6 +100,14 @@ fn set_collapsed(app: AppHandle, shared: State<Shared>, collapsed: bool) {
     shared.gate.set_active(!collapsed);
 }
 
+/// Lock mode: always click-through. Applied right away, since the poll only
+/// re-evaluates when the cursor moves.
+#[tauri::command]
+fn set_locked(app: AppHandle, shared: State<Shared>, locked: bool) {
+    island::set_ignore_cursor(&app, locked);
+    shared.gate.set_locked(locked);
+}
+
 /// The front end pushes the island shape; Rust decides click-through from it.
 #[tauri::command]
 fn set_island_rect(shared: State<Shared>, x: f64, y: f64, width: f64, height: f64) {
@@ -113,6 +121,8 @@ fn focus_window(app: AppHandle, focused: bool) {
     if focused {
         island::force_foreground(&win);
         let _ = win.set_focus();
+    } else {
+        island::restore_foreground(&win);
     }
 }
 
@@ -426,6 +436,13 @@ pub fn run() {
             live::capture::capture_save,
             live::capture::capture_hotkey,
             live::extras::volume_step,
+            live::lyrics::lyrics_get,
+            live::ai::ai_status,
+            live::ai::ai_start,
+            live::ai::ai_chat,
+            live::ai::recent_files,
+            live::ai::recent_open,
+            live::ai::journal_append,
             live::extras::volume_set,
             live::extras::volume_mute,
             live::extras::clip_set,
@@ -439,6 +456,14 @@ pub fn run() {
             live::capture::capture_open,
             live::calendar::calendar_refresh,
             live::notifs::notif_open,
+            set_locked,
+            live::tools::pick_color,
+            live::tools::apps_list,
+            live::tools::app_launch,
+            live::tools::system_action,
+            live::dev::transcript_stats,
+            live::usage::usage_today,
+            live::usage::usage_days,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

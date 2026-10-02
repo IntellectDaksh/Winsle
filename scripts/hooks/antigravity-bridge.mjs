@@ -1,5 +1,5 @@
 // Antigravity hook -> Winsle. Translates Antigravity's hook payload into the
-// ai-assistant Code shape winsle-hook.exe forwards to the island, then always prints
+// ai_assistant Code shape winsle-hook.exe forwards to the island, then always prints
 // "{}" so Antigravity proceeds with its default behaviour.
 // Note: activity only, no approvals. Antigravity has no "permission needed"
 // event; routing every PreToolUse to the island would gate every tool call.

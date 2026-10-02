@@ -1,16 +1,16 @@
-//! winsle-hook — the relay ai-assistant Code runs on every hook event.
+//! winsle-hook — the relay ai_assistant Code runs on every hook event.
 //!
 //! Reads the hook JSON on stdin, adds a little terminal context, and hands it to
 //! Winsle over the named pipe `\\.\pipe\winsle-<sid>`.
 //!
-//! Hard rule (docs/ai-assistant.md): **never block ai-assistant Code.**
+//! Hard rule (docs/ai_assistant.md): **never block ai_assistant Code.**
 //! * If the pipe does not exist — Winsle is closed — we exit 0 immediately with
 //!   nothing on stdout, and the session carries on untouched.
 //! * Every step runs under a deadline enforced by the main thread, so a pipe that
 //!   accepts the connection and then stops reading cannot wedge the session
 //!   either: we abandon the worker and exit.
 //! * Only `PermissionRequest` waits for an answer, because approving from the
-//!   island is the whole point. No answer means empty stdout, and ai-assistant Code
+//!   island is the whole point. No answer means empty stdout, and ai_assistant Code
 //!   asks in the terminal exactly as if Winsle were not installed.
 //!
 //! Usage: `winsle-hook <EventName>` (the name is also read from the JSON).
@@ -19,7 +19,7 @@ use std::io::{Read, Write};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-/// Budget for getting a pipe connection. Beyond this ai-assistant Code wins, always.
+/// Budget for getting a pipe connection. Beyond this ai_assistant Code wins, always.
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(300);
 /// Whole-run budget for an event nobody waits on: connect and write, no more.
 const FIRE_AND_FORGET_BUDGET: Duration = Duration::from_secs(2);
@@ -32,7 +32,7 @@ const ERROR_PIPE_BUSY: i32 = 231;
 
 /// Fields that are pointless to forward and can be enormous (a whole file read,
 /// a full command output). The island never shows them.
-const DROPPED_FIELDS: &[&str] = &["tool_response", "transcript_path"];
+const DROPPED_FIELDS: &[&str] = &["tool_response"];
 /// Longest string forwarded for any single field; the island truncates to far
 /// less than this anyway.
 const MAX_FIELD_LEN: usize = 2_000;
@@ -49,7 +49,7 @@ fn pipe_path() -> String {
 }
 
 /// Opens the pipe. Retries only while the server is busy: any other error means
-/// there is nothing to talk to, and waiting would only delay ai-assistant Code.
+/// there is nothing to talk to, and waiting would only delay ai_assistant Code.
 fn connect() -> Option<std::fs::File> {
     use std::os::windows::io::AsRawHandle;
     let path = pipe_path();
@@ -93,17 +93,17 @@ fn main() {
             let _ = out.flush();
         }
     }
-    // Nothing printed: ai-assistant Code asks in the terminal, as if we were not here.
+    // Nothing printed: ai_assistant Code asks in the terminal, as if we were not here.
     std::process::exit(0);
 }
 
 /// The documented PermissionRequest output. Anything we do not recognise prints
 /// nothing at all rather than guessing — silence is the safe answer.
-/// See https://code.ai-assistant.com/docs/en/hooks
+/// See https://code.ai_assistant.com/docs/en/hooks
 fn decision_json(decision: &str) -> Option<String> {
     let behavior = match decision.trim() {
         // "always" still answers a plain allow; remembering it is the island's
-        // business, not ai-assistant Code's.
+        // business, not ai_assistant Code's.
         "allow" | "always" => r#"{"behavior":"allow"}"#.to_string(),
         "deny" => r#"{"behavior":"deny","message":"Denied from Winsle"}"#.to_string(),
         _ => return None,
@@ -163,7 +163,7 @@ fn read_event() -> Option<(String, String)> {
         ("wt_session", "WT_SESSION"),
         ("term_session_id", "TERM_SESSION_ID"),
         ("vscode_pid", "VSCODE_PID"),
-        ("session_pid", "ai-assistant_CODE_SSE_PORT"),
+        ("session_pid", "ai_assistant_CODE_SSE_PORT"),
     ] {
         if !map.contains_key(key) {
             let value = std::env::var(var).unwrap_or_default();
@@ -243,7 +243,7 @@ mod tests {
             decision_json("deny").unwrap(),
             r#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Denied from Winsle"}}}"#
         );
-        // "always" is an island concept; ai-assistant Code just gets an allow.
+        // "always" is an island concept; ai_assistant Code just gets an allow.
         assert!(decision_json("always").unwrap().contains(r#""behavior":"allow""#));
     }
 

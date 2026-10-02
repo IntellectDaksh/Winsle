@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 use windows::Win32::System::SystemInformation::GetLocalTime;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    RegisterHotKey, HOT_KEY_MODIFIERS, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, VK_F, VK_N, VK_SPACE, VK_V, VK_W,
+    RegisterHotKey, HOT_KEY_MODIFIERS, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, VK_C, VK_F, VK_K, VK_L, VK_N, VK_SPACE, VK_V, VK_W,
 };
 use windows::Win32::UI::Shell::FOLDERID_Documents;
 use windows::Win32::UI::WindowsAndMessaging::{GetMessageW, MSG, WM_HOTKEY};
@@ -28,6 +28,14 @@ pub fn spawn(app: AppHandle) {
     std::thread::spawn(move || {
         let mods: HOT_KEY_MODIFIERS = MOD_CONTROL | MOD_ALT | MOD_NOREPEAT;
         // RegisterHotKey with no window posts WM_HOTKEY to this thread's queue.
+        // A Winsle that is still shutting down can hold the keys for a moment.
+        for _ in 0..10 {
+            if unsafe { RegisterHotKey(None, 99, mods, VK_SPACE.0 as u32) }.is_ok() {
+                let _ = unsafe { windows::Win32::UI::Input::KeyboardAndMouse::UnregisterHotKey(None, 99) };
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(300));
+        }
         let active = unsafe {
             if RegisterHotKey(None, 1, mods, VK_SPACE.0 as u32).is_ok() {
                 "Ctrl+Alt+Space"
@@ -40,7 +48,7 @@ pub fn spawn(app: AppHandle) {
             }
         };
         let _ = ACTIVE_HOTKEY.set(active);
-        for (id, vk, name) in [(2, VK_W, "W"), (3, VK_F, "F"), (4, VK_V, "V")] {
+        for (id, vk, name) in [(2, VK_W, "W"), (3, VK_F, "F"), (4, VK_V, "V"), (5, VK_L, "L"), (6, VK_C, "C"), (7, VK_K, "K")] {
             if unsafe { RegisterHotKey(None, id, mods, vk.0 as u32) }.is_err() {
                 crate::log::line(format!("capture: Ctrl+Alt+{name} is taken"));
             }
@@ -54,6 +62,13 @@ pub fn spawn(app: AppHandle) {
                     2 => crate::live::emit(&app, "island-toggle", ()),
                     3 => crate::live::emit(&app, "hotkey-focus", ()),
                     4 => crate::live::emit(&app, "hotkey-clips", ()),
+                    5 => crate::live::emit(&app, "hotkey-lock", ()),
+                    7 => crate::live::emit(&app, "hotkey-palette", ()),
+                    6 => {
+                        if let Some(c) = crate::live::tools::pick_color() {
+                            crate::live::emit(&app, "color-picked", c);
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -77,7 +92,7 @@ fn task_line(text: &str, stamp: &str) -> Result<String, String> {
     Ok(format!("- [ ] {text}  _({stamp})_\n"))
 }
 
-fn inbox_path(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn inbox_path(app: &AppHandle) -> Result<PathBuf, String> {
     let configured = app
         .state::<crate::Shared>()
         .settings

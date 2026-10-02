@@ -33,10 +33,10 @@ export async function refreshConfigured() {
     State.integrations[id] = { ...info, configured: present };
   }
   const hooks = State.settings.hooksInstalled;
-  const ai-assistant = State.integrations.integration_ai-assistant ?? {
+  const ai_assistant = State.integrations.integration_ai_assistant ?? {
     data: {}, error: null, loaded: false, configured: false,
   };
-  State.integrations.integration_ai-assistant = { ...ai-assistant, configured: hooks };
+  State.integrations.integration_ai_assistant = { ...ai_assistant, configured: hooks };
   State.notify();
 }
 

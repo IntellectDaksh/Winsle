@@ -1,5 +1,5 @@
 // Settings window — the place where anything that writes to disk is confirmed.
-// Stage 2 covers the ai-assistant Code hooks and the general preferences; API keys and
+// Stage 2 covers the ai_assistant Code hooks and the general preferences; API keys and
 // integrations land here too in a later stage.
 
 import "./settings.css";
@@ -43,14 +43,14 @@ function renderDiff(text: string): HTMLElement {
   return box;
 }
 
-// ── ai-assistant Code section ───────────────────────────────────────────────────────
+// ── ai_assistant Code section ───────────────────────────────────────────────────────
 
-function ai-assistantSection(status: HookStatus): HTMLElement {
+function ai_assistantSection(status: HookStatus): HTMLElement {
   const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
   const section = h(
     "section",
     {},
-    h("h2", {}, statusDot(status.installed), h("span", { text: "ai-assistant Code" })),
+    h("h2", {}, statusDot(status.installed), h("span", { text: "ai_assistant Code" })),
     body,
   );
 
@@ -61,7 +61,7 @@ function ai-assistantSection(status: HookStatus): HTMLElement {
     draw();
     const head = section.querySelector("h2")!;
     clear(head);
-    head.append(statusDot(status.installed), h("span", { text: "ai-assistant Code" }));
+    head.append(statusDot(status.installed), h("span", { text: "ai_assistant Code" }));
   };
 
   function draw() {
@@ -69,8 +69,8 @@ function ai-assistantSection(status: HookStatus): HTMLElement {
       h("div", {
         class: "hint",
         text: status.installed
-          ? "Winsle is hooked into your ai-assistant Code sessions. Tool calls, questions and permission requests show up in the island, and you can answer them there."
-          : "Install the hooks to see your ai-assistant Code sessions in the island and approve permissions without leaving what you are doing.",
+          ? "Winsle is hooked into your ai_assistant Code sessions. Tool calls, questions and permission requests show up in the island, and you can answer them there."
+          : "Install the hooks to see your ai_assistant Code sessions in the island and approve permissions without leaving what you are doing.",
       }),
       h("div", { class: "row" },
         h("label", { text: "settings.json" }),
@@ -97,7 +97,7 @@ function ai-assistantSection(status: HookStatus): HTMLElement {
       onclick: () => showPreview(true),
     });
     // Writing hook commands that point at a relay which isn't there would give
-    // every ai-assistant Code session a broken hook and nothing to show for it.
+    // every ai_assistant Code session a broken hook and nothing to show for it.
     if (!status.hookReady) {
       install.disabled = true;
       install.title = "The relay isn't installed yet.";
@@ -155,7 +155,7 @@ function ai-assistantSection(status: HookStatus): HTMLElement {
         clear(body);
         body.append(h("div", {
           class: "notice ok",
-          text: `Done. Previous settings saved as ${backup}. Open a new ai-assistant Code session to pick the hooks up.`,
+          text: `Done. Previous settings saved as ${backup}. Open a new ai_assistant Code session to pick the hooks up.`,
         }));
         window.setTimeout(() => void rebuild(), 2600);
       } catch (err) {
@@ -173,12 +173,12 @@ function ai-assistantSection(status: HookStatus): HTMLElement {
   return section;
 }
 
-// ── ai-assistant API section ────────────────────────────────────────────────────────
+// ── ai_assistant API section ────────────────────────────────────────────────────────
 
 const MODELS: [string, string][] = [
-  ["ai-assistant-opus-5", "ai-assistant Opus 5"],
-  ["ai-assistant-sonnet-5", "ai-assistant Sonnet 5"],
-  ["ai-assistant-haiku-4-5", "ai-assistant Haiku 4.5"],
+  ["ai_assistant-opus-5", "ai_assistant Opus 5"],
+  ["ai_assistant-sonnet-5", "ai_assistant Sonnet 5"],
+  ["ai_assistant-haiku-4-5", "ai_assistant Haiku 4.5"],
 ];
 
 function apiSection(hasKey: boolean): HTMLElement {
@@ -248,7 +248,7 @@ function apiSection(hasKey: boolean): HTMLElement {
   return h(
     "section",
     {},
-    h("h2", {}, dot, h("span", { text: "ai-assistant" })),
+    h("h2", {}, dot, h("span", { text: "ai_assistant" })),
     state,
     h("div", { class: "row" }, h("label", { text: "API key" }), field, saveBtn, clearBtn),
     h("div", { class: "row" }, h("label", { text: "Model" }), model),
@@ -528,6 +528,17 @@ function liveSection(hasCalendar: boolean): HTMLElement {
   );
 }
 
+function aiRow(current: string): HTMLElement {
+  const sel = h("select", {}) as HTMLSelectElement;
+  sel.append(h("option", { value: "", text: "Best installed (auto)", selected: !current }));
+  void Bridge.aiStatus().then((st) => {
+    for (const m of st?.models ?? []) sel.append(h("option", { value: m, text: m, selected: m === current }));
+    if (st && !st.running) sel.append(h("option", { value: current, text: st.installed ? "Ollama not running — starts on first ask" : "Ollama not installed", disabled: true }));
+  });
+  sel.addEventListener("change", () => setPrefs({ aiModel: sel.value }));
+  return h("div", { class: "row" }, h("label", { text: "Assistant model" }), sel);
+}
+
 // ── Habits & privacy ──────────────────────────────────────────────────────────
 
 function habitsSection(): HTMLElement {
@@ -561,7 +572,11 @@ function habitsSection(): HTMLElement {
     h("div", { class: "row" }, h("label", { text: "Clipboard history" }), check(p.clipHistory, (v) => setPrefs({ clipHistory: v })), clearClips),
     h("div", { class: "hint", text: "Last 25 copied texts, stored only on this PC. Things that look like keys or tokens are never recorded." }),
     cleared,
-    h("div", { class: "hint", text: "Shortcuts: Ctrl+Alt+Space capture · Ctrl+Alt+W show/hide · Ctrl+Alt+F focus timer · Ctrl+Alt+V clipboard." }),
+    aiRow(p.aiModel),
+    h("div", { class: "hint", text: "The assistant runs on Ollama on this PC (127.0.0.1 only). Winsle starts it when you ask something and the model unloads 3 min after the last request. Without it, the assistant still understands reminders, timers, tasks, media and calendar." }),
+    h("div", { class: "row" }, h("label", { text: "Spotify lyrics" }), check(p.lyrics, (v) => setPrefs({ lyrics: v }))),
+    h("div", { class: "hint", text: "Shows the line being sung in the compact island. Looks the song up on lrclib.net (artist, title and length only) once per track." }),
+    h("div", { class: "hint", text: "Shortcuts: Ctrl+Alt+K command palette · Ctrl+Alt+L lock (ghost mode) · Ctrl+Alt+C pick colour · Ctrl+Alt+Space capture · Ctrl+Alt+W show/hide · Ctrl+Alt+F focus · Ctrl+Alt+V clipboard." }),
   );
 }
 
@@ -590,7 +605,7 @@ async function main() {
   clear(root);
   root.append(
     h("h1", {}, h("span", { text: "Winsle" }), h("span", { class: "version", text: version })),
-    ai-assistantSection(status),
+    ai_assistantSection(status),
     apiSection(hasKey),
     integrationsSection(present),
     homeSection(),

@@ -1,0 +1,21 @@
+// Pure-logic checks for the front end (no DOM): cd app && node scripts/logic-check.mjs
+import { build } from "esbuild";
+import assert from "node:assert/strict";
+const out = await build({ entryPoints: ["src/live/calc.ts"], bundle: true, write: false, format: "esm", platform: "node" });
+const { evaluate, convert } = await import("data:text/javascript," + encodeURIComponent(out.outputFiles[0].text));
+assert.equal(evaluate("12*8+4"), "100");
+assert.equal(evaluate("(2+3)^2"), "25");
+assert.equal(evaluate("sqrt(16)+1"), "5");
+assert.equal(evaluate("25"), null);
+assert.equal(evaluate("10 min"), null);
+assert.equal(evaluate("hello"), null);
+assert.equal(convert("5 km to mi"), "3.107 mi");
+assert.equal(convert("30 c"), "86 °F");
+assert.equal(convert("2 kg"), "4.409 lb");
+assert.equal(convert("5 km to kg"), null);
+console.log("logic ok");
+const re = /^remind me (?:in|after) (\d+(?:\.\d+)?)\s*(minutes?|mins?|m|hours?|hrs?|h|seconds?|secs?|s)\b\s*(?:to\s+)?(.*)$/i;
+assert.equal(re.exec("remind me in 1 min to test winsle")[3], "test winsle");
+assert.equal(re.exec("remind me in 2 hours to call mum")[2], "hours");
+assert.equal(re.exec("remind me in 20m stretch")[3], "stretch");
+console.log("reminder parse ok");

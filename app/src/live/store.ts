@@ -7,7 +7,8 @@ import type { IslandViewName } from "../core/layout";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
 import { load, prefs, save, today } from "./prefs";
-import type { TaskLine } from "./types";
+import { trackChanged } from "./lyrics";
+import type { AppUsage, ColorInfo, TaskLine } from "./types";
 import type {
   CalendarEvent, CalendarInfo, ClipInfo, MediaInfo, NetInfo, PowerInfo, VolumeInfo, NotifInfo, PrivacyInfo, ProgressItem, ProgressInfo, SysInfo,
 } from "./types";
@@ -15,7 +16,9 @@ import type {
 export type CompactKind = "flash" | "calendar" | "timer" | "sys" | "progress" | "media";
 
 export interface Flash {
-  icon: "bell" | "check" | "note" | "cal" | "bolt" | "wifi" | "clip" | "vol" | "leaf" | "moon";
+  icon: "bell" | "check" | "note" | "cal" | "bolt" | "wifi" | "clip" | "vol" | "leaf" | "moon" | "bang" | "lock" | "drop" | "code";
+  /** Colour swatch instead of an icon (colour picker). */
+  swatch?: string;
   /** Optional 0–1 bar under the text (volume). */
   level?: number;
   color: string;
@@ -118,13 +121,22 @@ class LiveStore {
   /** performance.now() when the current stretch of continuous input began. */
   private activeSince = performance.now();
 
+  /** Ghost mode: dimmed, click-through, never opens on hover. */
+  locked: boolean = load<boolean>("locked", false);
+  colors: { hex: string; time: number }[] = load<{ hex: string; time: number }[]>("colors", []);
+  usage: AppUsage[] = [];
+  private usageAt = 0;
+  /** Per-app daily limits in minutes. */
+  limits: Record<string, number> = load<Record<string, number>>("limits", {});
+  private limitAlerted = new Set<string>();
+
   power: PowerInfo | null = null;
   online = true;
   volume: VolumeInfo | null = null;
   /** Notifications that arrived while a Focus timer ran — summarised after. */
   private heldDuringFocus = 0;
-  /** When the current ai-assistant Code burst of activity began (performance.now()). */
-  ai-assistantSince: number | null = null;
+  /** When the current ai_assistant Code burst of activity began (performance.now()). */
+  ai_assistantSince: number | null = null;
   private open: Opener = () => {};
   private reveal: () => void = () => {};
 
@@ -466,6 +478,65 @@ class LiveStore {
     State.notify();
   }
 
+  // ── Colour picker ───────────────────────────────────────────────────────────
+
+  private async onColor(c: ColorInfo) {
+    this.colors = [{ hex: c.hex, time: Date.now() }, ...this.colors.filter((x) => x.hex !== c.hex)].slice(0, 16);
+    save("colors", this.colors);
+    await this.copyClip(c.hex);
+    this.setFlash({
+      icon: "drop", color: c.hex, swatch: c.hex, title: `${c.hex} copied`,
+      sub: `rgb(${c.r}, ${c.g}, ${c.b}) · ${hsl(c.r, c.g, c.b)}`, view: "clips",
+    }, 3500);
+  }
+
+  removeColor(hex: string) {
+    this.colors = this.colors.filter((c) => c.hex !== hex);
+    save("colors", this.colors);
+    State.notify();
+  }
+
+  // ── Screen time ─────────────────────────────────────────────────────────────
+
+  async loadUsage(force = false) {
+    if (!force && performance.now() - this.usageAt < 60_000) return;
+    this.usageAt = performance.now();
+    const u = await Bridge.usageToday();
+    if (!u) return;
+    this.usage = u;
+    this.checkLimits();
+    State.notify();
+  }
+
+  usageTotal(): number {
+    return this.usage.reduce((a, x) => a + x.secs, 0);
+  }
+
+  setLimit(app: string, minutes: number) {
+    if (minutes > 0) this.limits = { ...this.limits, [app]: minutes };
+    else {
+      const { [app]: _, ...rest } = this.limits;
+      this.limits = rest;
+    }
+    save("limits", this.limits);
+    State.notify();
+  }
+
+  private checkLimits() {
+    const day = today();
+    for (const u of this.usage) {
+      const lim = this.limits[u.name];
+      const key = `${day}|${u.name}`;
+      if (!lim || u.secs < lim * 60 || this.limitAlerted.has(key)) continue;
+      this.limitAlerted.add(key);
+      Sound.play("peek");
+      this.setFlash({
+        icon: "leaf", color: "#F5A524", title: `${u.name}: ${Math.round(u.secs / 60)} min today`,
+        sub: `Past your ${lim} min limit`, view: "usage",
+      }, 9000);
+    }
+  }
+
   // ── Break reminder ──────────────────────────────────────────────────────────
 
   private async checkBreak() {
@@ -494,7 +565,7 @@ class LiveStore {
 
   // ── Wiring ──────────────────────────────────────────────────────────────────
 
-  private setFlash(f: Omit<Flash, "until">, ms: number) {
+  setFlash(f: Omit<Flash, "until">, ms: number) {
     this.flash = { ...f, until: performance.now() + ms };
     if (State.mode !== "expanded") this.reveal();
     State.notify();
@@ -512,6 +583,7 @@ class LiveStore {
       }
       this.media = m;
       this.mediaStamp = performance.now();
+      trackChanged(m);
       State.notify();
     });
 
@@ -550,7 +622,21 @@ class LiveStore {
 
     void onEvent<NotifInfo>("live-notif", (n) => {
       if (State.paused || this.mutedApps.includes(n.app)) return;
+      // The same toast again (PowerToys, OEM tools…): bump the old one, stay quiet.
+      const same = this.notifs.find((x) => x.app === n.app && x.title === n.title && x.body === n.body);
+      if (same) {
+        same.repeats = (same.repeats ?? 1) + 1;
+        same.time = n.time;
+        this.notifs = [same, ...this.notifs.filter((x) => x !== same)];
+        State.notify();
+        return;
+      }
+      n.noise = isNoise(n);
       this.notifs = [n, ...this.notifs.filter((x) => x.id !== n.id)].slice(0, 20);
+      if (n.noise) {
+        State.notify();
+        return;
+      }
       if (this.quietReason()) {
         // Focus / DND / meeting: keep it in the list, don't interrupt.
         this.heldDuringFocus++;
@@ -559,7 +645,7 @@ class LiveStore {
       }
       Sound.play("pop");
       if (State.mode !== "expanded") {
-        this.setFlash({ icon: "bell", color: "#60A5FA", title: n.app, sub: n.title || n.body, view: "notifs" }, 5500);
+        this.setFlash({ icon: "bell", color: appColor(n.app), title: n.app, sub: n.title && n.body ? `${n.title} — ${n.body}` : n.title || n.body, view: "notifs" }, 5500);
       } else {
         State.notify();
       }
@@ -630,6 +716,10 @@ class LiveStore {
       this.open("timer");
     });
     void onEvent<null>("hotkey-clips", () => this.open("clips"));
+    void onEvent<ColorInfo>("color-picked", (c) => void this.onColor(c));
+    // Screen time, refreshed in the background for limits and the recap.
+    window.setInterval(() => void this.loadUsage(), 5 * 60_000);
+    window.setTimeout(() => void this.loadUsage(true), 15_000);
 
     window.setInterval(() => void this.checkBreak(), 60_000);
     // The settings window shares this storage: pick up "Clear history".
@@ -777,4 +867,50 @@ export function fmtAgo(ms: number): string {
   if (mins < 60) return `${mins} min ago`;
   if (mins < 24 * 60) return `${Math.round(mins / 60)} h ago`;
   return new Date(ms).toLocaleDateString([], { weekday: "short" });
+}
+
+/** "hsl(210, 60%, 40%)" for the colour picker. */
+export function hsl(r: number, g: number, b: number): string {
+  const [R, G, B] = [r / 255, g / 255, b / 255];
+  const max = Math.max(R, G, B);
+  const min = Math.min(R, G, B);
+  const l = (max + min) / 2;
+  const d = max - min;
+  let h = 0;
+  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  if (d) {
+    if (max === R) h = ((G - B) / d) % 6;
+    else if (max === G) h = (B - R) / d + 2;
+    else h = (R - G) / d + 4;
+  }
+  h = Math.round(h * 60 + 360) % 360;
+  return `hsl(${h}, ${Math.round(sat * 100)}%, ${Math.round(l * 100)}%)`;
+}
+
+/** "3h 12m", "45m". */
+export function fmtHM(secs: number): string {
+  const m = Math.round(secs / 60);
+  return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`;
+}
+
+/** Toasts that are almost never worth an interruption. */
+const NOISE_APPS = /^(ASUS|MyASUS|Armoury Crate|GlideX|Windows|NVIDIA|Creative Cloud|Acrobat)$/i;
+const NOISE_TEXT = /administrator privileges|update (is )?available|survey|tips? (for|and)|get the most out of/i;
+
+export function isNoise(n: NotifInfo): boolean {
+  return NOISE_APPS.test(n.app) || NOISE_TEXT.test(`${n.title} ${n.body}`) || /^PowerToys$/.test(n.app);
+}
+
+/** Stable accent per app name (notification avatars). */
+export function appColor(app: string): string {
+  const known: Record<string, string> = {
+    WhatsApp: "#25D366", Discord: "#5865F2", Slack: "#E01E5A", Teams: "#6264A7", Outlook: "#0F6CBD",
+    Chrome: "#4285F4", Edge: "#0EA5E9", Spotify: "#1DB954", Telegram: "#2AABEE", Gmail: "#EA4335",
+    "VS Code": "#3B9EFF", Antigravity: "#A78BFA",
+  };
+  if (known[app]) return known[app];
+  const palette = ["#60A5FA", "#F472B6", "#FBBF24", "#34D399", "#A78BFA", "#F87171", "#22D3EE"];
+  let h = 0;
+  for (let i = 0; i < app.length; i++) h = (h * 31 + app.charCodeAt(i)) | 0;
+  return palette[Math.abs(h) % palette.length];
 }

@@ -1,11 +1,12 @@
 // The idle capsule: nothing live is taking over the island, so it shows a short
-// rotating gist of what is going on — what ai-assistant Code just did, the latest
+// rotating gist of what is going on — what ai_assistant Code just did, the latest
 // notification, the next event, the clock — and after a few quiet seconds fades
 // the whole island down to ~78 % opacity.
 
 import { State } from "../core/state";
 import { h } from "../views/dom";
-import { Live, fmtUntil } from "./store";
+import { Live, fmtHM, fmtUntil } from "./store";
+import { Dev } from "./dev";
 
 const ROTATE_MS = 6000;
 /** Quiet time before the capsule dims. */
@@ -33,23 +34,24 @@ function clock(): GistItem {
 function gist(): GistItem[] {
   const items: GistItem[] = [];
 
-  const ai-assistant = State.tasks.find((t) => t.id === "integration_ai-assistant");
-  if (ai-assistant && (ai-assistant.state !== "idle" || ai-assistant.steps.length)) {
-    const step = ai-assistant.steps.at(-1);
+  const ai_assistant = State.tasks.find((t) => t.id === "integration_ai_assistant");
+  if (ai_assistant && (ai_assistant.state !== "idle" || ai_assistant.steps.length)) {
+    const step = ai_assistant.steps.at(-1);
     const status =
-      ai-assistant.state === "finished" ? "done" :
-      ai-assistant.state === "approval" ? "needs you" :
-      ai-assistant.state === "error" ? "stopped" :
-      ai-assistant.state === "idle" ? "last" : "working";
-    const since = Live.ai-assistantSince;
-    const mins = since != null && ai-assistant.state !== "idle" ? Math.floor((performance.now() - since) / 60_000) : 0;
-    items.push({ key: "ai-assistant", label: `ai-assistant · ${status}${mins > 0 ? ` ${mins}m` : ""}`, color: "#A78BFA", text: step ?? "" });
+      ai_assistant.state === "finished" ? "done" :
+      ai_assistant.state === "approval" ? "needs you" :
+      ai_assistant.state === "error" ? "stopped" :
+      ai_assistant.state === "idle" ? "last" : "working";
+    const since = Live.ai_assistantSince;
+    const mins = since != null && ai_assistant.state !== "idle" ? Math.floor((performance.now() - since) / 60_000) : 0;
+    items.push({ key: "ai_assistant", label: `ai_assistant · ${status}${mins > 0 ? ` ${mins}m` : ""}`, color: "#A78BFA", text: step ?? "" });
   }
 
-  const n = Live.notifs[0];
+  const n = Live.notifs.find((x) => !x.noise);
   if (n && Date.now() - n.time < NOTIF_FRESH_MS) {
     items.push({ key: `n${n.id}`, label: n.app, color: "#60A5FA", text: n.title || n.body });
   }
+  items.push(...suggestions());
 
   const now = Date.now();
   const e = Live.calendar.events.find((x) => x.end > now && x.start - now < EVENT_SOON_MS);
@@ -67,6 +69,40 @@ function gist(): GistItem[] {
 
   items.push(clock());
   return items;
+}
+
+const TIPS: [string, string][] = [
+  ["Ctrl+Alt+K", "palette — apps, maths, timers, web"],
+  ["Ctrl+Alt+L", "ghost mode — click straight through me"],
+  ["Ctrl+Alt+C", "copy the colour under your cursor"],
+  ["Ctrl+Alt+V", "everything you copied today"],
+  ["Ctrl+Alt+F", "start a 25 min focus"],
+  ["Ctrl+Alt+Space", "jot a task without switching apps"],
+];
+
+/** Small, situational nudges built from what Winsle already knows. One at most. */
+function suggestions(): GistItem[] {
+  const out: GistItem[] = [];
+  const s = Dev.session;
+  const pct = Dev.contextPct();
+  if (s && pct != null && pct >= 70 && s.status !== "idle") {
+    out.push({ key: "ctx", label: `Context ${Math.round(pct)}%`, color: "#F5A524", text: "/compact soon keeps ai_assistant sharp" });
+  }
+  const open = Live.tasks.filter((t) => !t.done);
+  if (open.length) out.push({ key: "task", label: `${open.length} open task${open.length > 1 ? "s" : ""}`, color: "#A78BFA", text: open[open.length - 1].text });
+  const top = Live.usage[0];
+  const total = Live.usageTotal();
+  if (total >= 3 * 3600 && Live.focusToday().sessions === 0) {
+    out.push({ key: "focus-nudge", label: fmtHM(total), color: "#34D399", text: "on screen today — try one focus block" });
+  } else if (top && top.secs >= 2 * 3600) {
+    out.push({ key: "top-app", label: top.name, color: "#60A5FA", text: `${fmtHM(top.secs)} today` });
+  }
+  const f = Live.focusToday();
+  if (f.streak > 1) out.push({ key: "streak", label: `${f.streak}-day streak`, color: "#F5A524", text: `${f.minutes} min focused today` });
+  // A rotating shortcut tip, about once in every few rounds.
+  const tip = TIPS[Math.floor(Date.now() / 600_000) % TIPS.length];
+  out.push({ key: `tip${tip[0]}`, label: tip[0], color: "var(--dim)", text: tip[1] });
+  return out.slice(0, 2);
 }
 
 export class IdleLine {
@@ -94,7 +130,7 @@ export class IdleLine {
     }
     const item = items[this.index % items.length];
     if (item.key === this.shownKey) {
-      // Same item, fresher content (a new ai-assistant step, the clock ticking).
+      // Same item, fresher content (a new ai_assistant step, the clock ticking).
       this.fill(item);
       return;
     }

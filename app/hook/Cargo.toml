@@ -1,6 +1,6 @@
 [package]
 name = "winsle-hook"
-description = "Relays ai-assistant Code hook events to Winsle over a named pipe"
+description = "Relays ai_assistant Code hook events to Winsle over a named pipe"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

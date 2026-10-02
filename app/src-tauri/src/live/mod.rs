@@ -8,13 +8,17 @@ use tauri::{AppHandle, Emitter};
 
 pub mod calendar;
 pub mod capture;
+pub mod dev;
+pub mod ai;
 pub mod extras;
+pub mod lyrics;
 pub mod media;
 pub mod notifs;
 pub mod privacy;
 pub mod progress;
 pub mod sys;
 pub mod tools;
+pub mod usage;
 
 static PAUSED: AtomicBool = AtomicBool::new(false);
 
@@ -49,5 +53,6 @@ fn start_now(app: AppHandle) {
     notifs::spawn(app.clone());
     calendar::spawn(app.clone());
     extras::spawn(app.clone());
+    usage::spawn();
     capture::spawn(app);
 }

@@ -30,7 +30,13 @@ export type IslandViewName =
   | "files"
   | "notifs"
   | "capture"
-  | "clips";
+  | "clips"
+  | "dev"
+  | "palette"
+  | "usage"
+  | "today"
+  | "more"
+  | "agent";
 
 export type BotStateName =
   | "idle"
@@ -68,6 +74,8 @@ export const NOTCH_H = 38;
 export const COMPACT_W = 288; // NOTCH_W + 104
 /** Compact island while a live activity (song, timer, download…) is shown in it. */
 export const COMPACT_LIVE_W = 420;
+/** Widest the compact island grows (a long lyric line). */
+export const COMPACT_LIVE_MAX_W = 480;
 export const EXPANDED_W = 640;
 
 export const ROUNDED_CORNER = 14; // hidden / compact
@@ -104,7 +112,13 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   files: { height: 176, botX: 44, botY: null, botDiameter: 34, agentMode: "none" },
   notifs: { height: 176, botX: 44, botY: null, botDiameter: 34, agentMode: "none" },
   capture: { height: 176, botX: 44, botY: null, botDiameter: 34, agentMode: "none" },
-  clips: { height: 176, botX: 44, botY: null, botDiameter: 34, agentMode: "none" },
+  clips: { height: 236, botX: 44, botY: null, botDiameter: 34, agentMode: "none" },
+  dev: { height: 236, botX: 44, botY: 74, botDiameter: 34, agentMode: "none" },
+  palette: { height: 262, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
+  usage: { height: 212, botX: 44, botY: 74, botDiameter: 34, agentMode: "none" },
+  agent: { height: 262, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
+  more: { height: 196, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
+  today: { height: 240, botX: 44, botY: 74, botDiameter: 34, agentMode: "none" },
 };
 
 // The upload views above are only the fallback geometry. Once a file is actually
@@ -120,7 +134,8 @@ export function islandSize(
   mode: IslandMode,
   view: IslandViewName,
   chatCount = 0,
-  compactLive = false,
+  /** Width of the compact island while a live activity shows; 0 = none. */
+  compactLive = 0,
 ): { w: number; h: number } {
   switch (mode) {
     case "hidden":
@@ -128,7 +143,7 @@ export function islandSize(
       // slides into the top edge of the screen instead of sitting there as a bar.
       return { w: NOTCH_W, h: 0 };
     case "compact":
-      return { w: compactLive ? COMPACT_LIVE_W : COMPACT_W, h: NOTCH_H };
+      return { w: compactLive > 0 ? Math.min(compactLive, COMPACT_LIVE_MAX_W) : COMPACT_W, h: NOTCH_H };
     case "expanded": {
       const h = view === "prompt" ? chatPromptHeight(chatCount) : VIEW_LAYOUTS[view].height;
       return { w: EXPANDED_W, h };

@@ -3,7 +3,7 @@
 import type { BotEmoteName, BotStateName, IslandMode, IslandViewName } from "./layout";
 import type { EyeShape } from "../mochi/engine";
 
-export type AgentSource = "ai-assistantCode" | "n8n";
+export type AgentSource = "ai_assistantCode" | "n8n";
 export type PillBadge = "approval" | "finished" | "error";
 
 export interface AgentTask {
@@ -58,7 +58,7 @@ const task = (
 
 /** AgentTask.integrationAgents — same ids, names and colours as macOS. */
 export const INTEGRATION_AGENTS: AgentTask[] = [
-  task("integration_ai-assistant", "VS Code", "#F5F6F8", "ai-assistantCode"),
+  task("integration_ai_assistant", "VS Code", "#F5F6F8", "ai_assistantCode"),
   task("integration_resend", "Resend", "#22C55E", "n8n"),
   task("integration_n8n", "n8n", "#F29B38", "n8n"),
   task("integration_vercel", "Vercel", "#7C5CFF", "n8n"),
@@ -90,7 +90,7 @@ export interface Settings {
   screen: "primary" | "cursor";
   autostart: boolean;
   hooksInstalled: boolean;
-  /** ai-assistant model used by the chat. */
+  /** ai_assistant model used by the chat. */
   model: string;
   /** Folders watched for growing render outputs. */
   renderDirs: string[];
@@ -111,7 +111,7 @@ export const DEFAULT_SETTINGS: Settings = {
   screen: "primary",
   autostart: true,
   hooksInstalled: false,
-  model: "ai-assistant-opus-5",
+  model: "ai_assistant-opus-5",
   renderDirs: [],
   captureDir: "",
   homeWidgets: ["media", "calendar", "integrations"],
@@ -212,7 +212,7 @@ class AppState {
   loadIntegrationTasks() {
     for (const proto of INTEGRATION_AGENTS) {
       const shouldLoad =
-        proto.id === "integration_ai-assistant" || this.settings.activeIntegrations.includes(proto.id);
+        proto.id === "integration_ai_assistant" || this.settings.activeIntegrations.includes(proto.id);
       const idx = this.tasks.findIndex((t) => t.id === proto.id);
       if (shouldLoad && idx < 0) this.tasks.push({ ...proto, steps: [] });
       if (!shouldLoad && idx >= 0) this.tasks.splice(idx, 1);
@@ -220,16 +220,16 @@ class AppState {
     // Keep the declared order so pills never shuffle.
     const order = INTEGRATION_AGENTS.map((t) => t.id);
     this.tasks.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-    if (!this.focusId) this.focusId = "integration_ai-assistant";
+    if (!this.focusId) this.focusId = "integration_ai_assistant";
     this.notify();
   }
 
   toggleIntegration(id: string) {
-    if (id === "integration_ai-assistant") return;
+    if (id === "integration_ai_assistant") return;
     const active = this.settings.activeIntegrations;
     if (active.includes(id)) {
       this.settings.activeIntegrations = active.filter((x) => x !== id);
-      if (this.focusId === id) this.focusId = "integration_ai-assistant";
+      if (this.focusId === id) this.focusId = "integration_ai_assistant";
     } else {
       if (active.length >= 4) return;
       this.settings.activeIntegrations = [...active, id];

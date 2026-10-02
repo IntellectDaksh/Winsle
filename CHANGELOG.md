@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.4.0
+
+### Added
+- Assistant (local mini agent): plain-language requests for reminders, timers, focus, tasks, media, volume, Do not disturb, calendar, screen time, journal and PC lock, handled by fast local rules; anything else goes to a local Ollama model that answers or uses one tool. Nothing leaves the PC.
+- Reminders: "remind me in 20 min to…" / "at 5pm…", with snooze and a countdown list.
+- Automations: focus pauses music, meetings pause music, app limits start a break, morning briefing, evening journal (journal.md).
+- Clipboard actions: summarise, fix grammar, translate to English, bullets, explain (local AI) plus UPPER / lower / Title / tidy / pretty JSON / slug.
+- Notification digest: grouped counts, and an AI summary of who needs a reply.
+- Snippets: saved text, pasted by name from the palette.
+- Recent files in the palette; "?question" in the palette asks the assistant.
+- Settings: assistant model picker.
+
+### Changed
+- Notifications: readable app names, repeats merged (×2), nagging sources listed quietly; idle line shows suggestions and tips.
+- Header: Assistant, Coding, Media, Timer, Calendar, Notifications and a More launcher; dark tooltips.
+
+### Fixed
+- The palette and quick capture now reliably take the keyboard when another app is in front.
+- Local AI is never started when RAM is already above 88 %, and a broken Ollama install is reported instead of retried.
+
+## 0.3.0
+
+### Added
+- Coding cockpit: live step timeline with timings, files changed, commands, failures, sub-agents, context window use, model, ai_assistant's last reply, turn history.
+- Command palette (`Ctrl+Alt+K`): apps, projects, calculator, unit conversion, timers, notes, web search, clipboard search, system actions.
+- Screen time: active foreground time per app, 7-day chart, per-app daily limits.
+- Today: one-glance recap of focus, screen time, coding, tasks, calendar, downloads, clipboard and notifications.
+- Colour picker (`Ctrl+Alt+C`): copies HEX, shows RGB / HSL, keeps a swatch history.
+- Ghost mode (`Ctrl+Alt+L`): 38 % opacity, fully click-through, no hover-open.
+- Synced Spotify lyrics in the compact island (lrclib.net); the compact island sizes itself to the track.
+- Accurate coding alerts: finish summary with duration, steps, files and reply; error detail; context warning at 80 %; reminder when a permission request waits a minute.
+
+### Fixed
+- Home coding card no longer overlaps; it shows project, status, current step and totals.
+- Keyboard focus returns to the previous app after the palette or quick capture closes.
+
 ## 0.2.0
 
 ### Added
@@ -28,4 +64,4 @@
 ## 0.1.1
 
 - Live activities: media, timer, calendar, downloads and renders, notifications, system, mic / camera, quick capture.
-- ai-assistant Code and Antigravity sessions, approvals and questions.
+- ai_assistant Code and Antigravity sessions, approvals and questions.

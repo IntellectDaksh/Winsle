@@ -5179,7 +5179,7 @@ dependencies = [
 
 [[package]]
 name = "winsle"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "base64 0.22.1",
  "keyring",
@@ -5199,7 +5199,7 @@ dependencies = [
 
 [[package]]
 name = "winsle-hook"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "serde_json",
  "windows 0.61.3",

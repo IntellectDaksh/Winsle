@@ -7,12 +7,27 @@ import { Bridge } from "../core/bridge";
 import { h, svg } from "../views/dom";
 import { ICONS } from "../views/icons";
 import { Live, fmtBytes, fmtClock, fmtUntil, type CompactKind } from "./store";
+import { COMPACT_LIVE_W } from "../core/layout";
+import { lineAt } from "./lyrics";
 
 interface Slot {
   kind: CompactKind;
   el: HTMLElement;
   update(): void;
+  /** Width the compact island should take for this content. */
+  width?(): number;
 }
+
+let measureCtx: CanvasRenderingContext2D | null = null;
+/** Pixel width of `text` in the strip's font. */
+function textW(text: string, font: string): number {
+  measureCtx ??= document.createElement("canvas").getContext("2d");
+  if (!measureCtx) return text.length * 7;
+  measureCtx.font = font;
+  return measureCtx.measureText(text).width;
+}
+const FONT_A = "600 11.5px Inter, Segoe UI, sans-serif";
+const FONT_B = "400 10.5px Inter, Segoe UI, sans-serif";
 
 function twoLines(): { box: HTMLElement; a: HTMLElement; b: HTMLElement } {
   const a = h("span", { class: "a" });
@@ -47,14 +62,30 @@ function buildSlot(kind: CompactKind): Slot {
       const btn = h("div", { class: "btns" });
       let playing: boolean | null = null;
       let artSrc: string | null | undefined;
+      let lyric: string | null = null;
       return {
         kind,
         el: h("div", { class: "slot" }, art, box, eq, btn),
+        width() {
+          const m = Live.media;
+          if (!m) return COMPACT_LIVE_W;
+          // Mochi + art + gaps + equaliser + buttons + right padding = 196.
+          const text = Math.max(textW(m.title || m.app, FONT_A), textW(lyric ?? m.artist ?? "", lyric ? FONT_A : FONT_B));
+          return Math.round(Math.max(300, Math.min(480, 196 + text)) / 8) * 8;
+        },
         update() {
           const m = Live.media;
           if (!m) return;
+          const line = lineAt(m, Live.mediaPosition());
+          if (line !== lyric) {
+            lyric = line;
+            b.classList.remove("lyric-in");
+            void b.offsetWidth;
+            if (line) b.classList.add("lyric-in");
+          }
           a.textContent = m.title || m.app;
-          b.textContent = m.artist || m.app;
+          b.textContent = lyric ?? (m.artist || m.app);
+          b.classList.toggle("lyric", !!lyric);
           eq.classList.toggle("on", m.playing);
           if (m.art !== artSrc) {
             artSrc = m.art;
@@ -154,17 +185,24 @@ function buildSlot(kind: CompactKind): Slot {
         update() {
           const f = Live.flash;
           if (!f) return;
-          const k = `${f.icon}|${f.title}|${f.sub}|${f.level ?? ""}`;
+          const k = `${f.icon}|${f.title}|${f.sub}|${f.level ?? ""}|${f.swatch ?? ""}`;
           if (k === key) return;
           key = k;
           const glyph = {
             check: ICONS.check, note: ICONS.pencil, bell: ICONS.bell, cal: ICONS.calendar,
             bolt: ICONS.bolt, wifi: ICONS.wifi, clip: ICONS.clipboard,
             vol: f.level === 0 ? ICONS.speakerOff : ICONS.speakerOn, leaf: ICONS.leaf, moon: ICONS.moon,
+            bang: ICONS.bang, lock: ICONS.lock, drop: ICONS.drop, code: ICONS.code,
           }[f.icon];
-          icon.replaceChildren(svg(glyph, 12, f.icon === "check" ? { stroke: 2.6 } : {}));
-          icon.style.color = f.color;
-          icon.style.background = `${f.color}26`;
+          icon.classList.toggle("swatch", !!f.swatch);
+          if (f.swatch) {
+            icon.replaceChildren();
+            icon.style.background = f.swatch;
+          } else {
+            icon.replaceChildren(svg(glyph, 12, f.icon === "check" ? { stroke: 2.6 } : {}));
+            icon.style.color = f.color;
+            icon.style.background = `${f.color}26`;
+          }
           a.textContent = f.title;
           b.textContent = f.sub;
           // Volume HUD: a bar instead of a second line.
@@ -193,8 +231,8 @@ export class CompactLive {
     this.dots.append(this.quietDot, this.micDot, this.camDot);
   }
 
-  /** Returns whether the compact island should be in its wide live form. */
-  sync(compact: boolean): boolean {
+  /** Width of the compact island's live form, or 0 when nothing live shows. */
+  sync(compact: boolean): number {
     const kind = compact ? Live.compactKind() : null;
     if (kind !== (this.slot?.kind ?? null)) {
       this.strip.classList.remove("on");
@@ -223,6 +261,7 @@ export class CompactLive {
     const quiet = Live.quietReason();
     this.quietDot.classList.toggle("on", !!quiet);
     this.quietDot.title = quiet ? `${quiet} — notifications held` : "";
-    return kind != null;
+    if (!kind) return 0;
+    return this.slot?.width?.() ?? COMPACT_LIVE_W;
   }
 }

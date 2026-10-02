@@ -65,6 +65,10 @@ export interface NotifInfo {
   title: string;
   body: string;
   time: number; // epoch ms
+  /** Same toast repeated (set by the store). */
+  repeats?: number;
+  /** From a source that only nags (OEM utilities, admin warnings): listed, never flashed. */
+  noise?: boolean;
 }
 
 export interface CalendarEvent {
@@ -117,4 +121,39 @@ export interface TaskLine {
   line: number;
   text: string;
   done: boolean;
+}
+
+/** `transcript_stats` — read from the ai_assistant Code transcript (.jsonl). */
+export interface TranscriptStats {
+  model: string | null;
+  contextTokens: number;
+  outputTokens: number;
+  lastText: string | null;
+  assistantTurns: number;
+}
+
+/** `color-picked` / `pick_color`. */
+export interface ColorInfo {
+  hex: string;
+  r: number;
+  g: number;
+  b: number;
+}
+
+/** `usage_today` — foreground time per app today. */
+export interface AppUsage {
+  name: string;
+  secs: number;
+}
+
+/** `usage_days` — total foreground time per day, oldest first. */
+export interface DayUsage {
+  day: string;
+  totalSecs: number;
+}
+
+/** `apps_list` — Start menu shortcuts. */
+export interface AppEntry {
+  name: string;
+  path: string;
 }

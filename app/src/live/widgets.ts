@@ -7,9 +7,9 @@ import { State } from "../core/state";
 import { h, svg, clear } from "../views/dom";
 import { ICONS } from "../views/icons";
 import type { ViewActions } from "../views/views";
-import { Live, fmtAgo, fmtBytes, fmtClock, fmtTime, fmtUntil } from "./store";
+import { Live, fmtAgo, fmtBytes, fmtClock, fmtHM, fmtTime, fmtUntil } from "./store";
 
-export type WidgetKind = "media" | "calendar" | "timer" | "system" | "files" | "notifs" | "clips" | "inbox" | "integrations";
+export type WidgetKind = "media" | "calendar" | "timer" | "system" | "files" | "notifs" | "clips" | "inbox" | "screen" | "integrations";
 
 export const WIDGET_LABELS: Record<WidgetKind, string> = {
   media: "Now playing",
@@ -20,6 +20,7 @@ export const WIDGET_LABELS: Record<WidgetKind, string> = {
   notifs: "Latest notification",
   clips: "Last copied",
   inbox: "Inbox tasks",
+  screen: "Screen time",
   integrations: "Integrations (pills)",
 };
 
@@ -32,7 +33,7 @@ export interface Widget {
 
 const VIEW_FOR: Record<WidgetKind, IslandViewName | null> = {
   media: "media", calendar: "calendar", timer: "timer", system: "system",
-  files: "files", notifs: "notifs", clips: "clips", inbox: "capture", integrations: null,
+  files: "files", notifs: "notifs", clips: "clips", inbox: "capture", screen: "usage", integrations: null,
 };
 
 function tile(kind: WidgetKind, actions: ViewActions, ...children: Node[]): HTMLElement {
@@ -277,6 +278,22 @@ function buildInbox(actions: ViewActions): Widget {
   };
 }
 
+function buildScreen(actions: ViewActions): Widget {
+  const big = h("div", { class: "w-big" });
+  const { box, a, b } = lines();
+  const el = tile("screen", actions, head(ICONS.chart, "Screen time"), big, box);
+  return {
+    el,
+    sync() {
+      const tot = Live.usageTotal();
+      el.classList.toggle("idle", !tot);
+      big.textContent = tot ? fmtHM(tot) : "—";
+      a.textContent = Live.usage[0]?.name ?? "Counting…";
+      b.textContent = Live.usage[0] ? fmtHM(Live.usage[0].secs) : "active use only";
+    },
+  };
+}
+
 export function buildWidget(
   kind: WidgetKind,
   actions: ViewActions,
@@ -291,6 +308,7 @@ export function buildWidget(
     case "notifs": return buildNotifs(actions);
     case "clips": return buildClips(actions);
     case "inbox": return buildInbox(actions);
+    case "screen": return buildScreen(actions);
     case "integrations": {
       const el = h("div", { class: "card wtile w-integrations" }, pills());
       return { el, sync() {} };

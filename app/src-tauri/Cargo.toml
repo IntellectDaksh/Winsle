@@ -57,4 +57,6 @@ windows = { version = "0.61", features = [
   "Win32_NetworkManagement_IpHelper",
   "Win32_NetworkManagement_Ndis",
   "Win32_Networking_WinSock",
+  "Win32_Graphics_Gdi",
+  "Win32_System_Shutdown",
 ] }

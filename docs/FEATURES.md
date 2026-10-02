@@ -2,7 +2,7 @@
 
 ## Coding sessions
 
-- ai-assistant Code and Antigravity sessions appear as tasks with live tool steps.
+- ai_assistant Code and Antigravity sessions appear as tasks with live tool steps.
 - Permission requests and questions open the island; allow or deny from there.
 - Several projects at once show as mini bots, each with its own colour.
 

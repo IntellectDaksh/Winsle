@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { Settings } from "./state";
-import type { ProcInfo, TaskLine } from "../live/types";
+import type { AppEntry, AppUsage, ColorInfo, DayUsage, ProcInfo, TaskLine, TranscriptStats } from "../live/types";
 
 export const IS_TAURI =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -64,12 +64,12 @@ export const Bridge = {
   /** Writes to %LOCALAPPDATA%\Winsle\winsle.log, next to the Rust lines. */
   log: (message: string) => call<void>("log_line", { message }),
 
-  // ── ai-assistant Code hooks ─────────────────────────────────────────────────────
+  // ── ai_assistant Code hooks ─────────────────────────────────────────────────────
   hooksStatus: () => call<HookStatus>("hooks_status"),
   /** Diff to show before anything is written. `install: false` previews removal. */
   hooksPreview: (install: boolean) => callOrThrow<HookPreview>("hooks_preview", { install }),
   /**
-   * Writes ~/.ai-assistant/settings.json — only ever after an explicit click, and only
+   * Writes ~/.ai_assistant/settings.json — only ever after an explicit click, and only
    * when the file still matches the preview the user looked at.
    */
   hooksApply: (install: boolean, fingerprint: string) =>
@@ -79,7 +79,7 @@ export const Bridge = {
     call<void>("approval_decision", { requestId, decision }),
   /** "The card is up" — until this lands the relay only waits a moment. */
   approvalAck: (requestId: string) => call<void>("approval_ack", { requestId }),
-  /** "Nobody can act on this" — ai-assistant Code asks in the terminal right away. */
+  /** "Nobody can act on this" — ai_assistant Code asks in the terminal right away. */
   approvalDecline: (requestId: string) => call<void>("approval_decline", { requestId }),
 
   // ── Chat, files, secrets ──────────────────────────────────────────────────
@@ -123,6 +123,25 @@ export const Bridge = {
   captureList: () => callOrThrow<TaskLine[]>("capture_list"),
   captureToggle: (line: number, text: string) => callOrThrow<boolean>("capture_toggle", { line, text }),
   captureOpen: () => call<void>("capture_open"),
+  transcriptStats: (path: string) => callOrThrow<TranscriptStats>("transcript_stats", { path }),
+  /** Ghost mode: the window ignores the mouse entirely. */
+  setLocked: (locked: boolean) => call<void>("set_locked", { locked }),
+  pickColor: () => call<ColorInfo | null>("pick_color"),
+  aiStatus: () => call<{ running: boolean; installed: boolean; models: string[] }>("ai_status"),
+  aiStart: () => callOrThrow<boolean>("ai_start"),
+  /** Local Ollama chat turn; rejects with a readable message. */
+  aiChat: (model: string, system: string, prompt: string, json = false) => callOrThrow<string>("ai_chat", { model, system, prompt, json }),
+  recentFiles: () => call<{ name: string; path: string; time: number }[]>("recent_files"),
+  recentOpen: (path: string) => callOrThrow<void>("recent_open", { path }),
+  journalAppend: (text: string) => callOrThrow<string>("journal_append", { text }),
+  /** Synced LRC text for a track, or null. */
+  lyrics: (artist: string, title: string, album: string, duration: number) =>
+    call<string | null>("lyrics_get", { artist, title, album, duration }),
+  usageToday: () => call<AppUsage[]>("usage_today"),
+  usageDays: (days: number) => call<DayUsage[]>("usage_days", { days }),
+  appsList: () => call<AppEntry[]>("apps_list"),
+  appLaunch: (path: string) => callOrThrow<void>("app_launch", { path }),
+  systemAction: (action: "lock" | "snip" | "settings" | "taskmgr") => callOrThrow<void>("system_action", { action }),
 
   /** Tray → Pause. Stops the integration pollers, not just the island. */
   setPaused: (paused: boolean) => call<void>("set_paused", { paused }),

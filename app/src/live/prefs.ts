@@ -9,9 +9,13 @@ export interface LivePrefs {
   quietInMeetings: boolean;
   /** Keep clipboard history at all. */
   clipHistory: boolean;
+  /** Synced lyrics for Spotify in the compact island (fetched from lrclib.net). */
+  lyrics: boolean;
+  /** Ollama model for the assistant; empty = best installed. */
+  aiModel: string;
 }
 
-export const DEFAULT_PREFS: LivePrefs = { breakMinutes: 50, quietInMeetings: true, clipHistory: true };
+export const DEFAULT_PREFS: LivePrefs = { breakMinutes: 50, quietInMeetings: true, clipHistory: true, lyrics: true, aiModel: "" };
 
 export function load<T>(key: string, fallback: T): T {
   try {

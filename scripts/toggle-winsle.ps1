@@ -12,7 +12,7 @@ if ($running) {
         Where-Object { $_.CommandLine -match 'com\.winsle\.app' } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 } elseif (Test-Path $exe) {
-    # Re-link ai-assistant Code (terminal + VS Code) and Antigravity on every start; no-op when already linked.
+    # Re-link ai_assistant Code (terminal + VS Code) and Antigravity on every start; no-op when already linked.
     node (Join-Path $PSScriptRoot 'hooks\link-hooks.mjs') | Out-Null
     Start-Process $exe
 } else {

@@ -2,9 +2,9 @@
 
 A dynamic island for Windows.
 
-Mochi lives at the top of your screen. It follows your ai-assistant Code and Antigravity sessions, and surfaces what is happening on the PC: media, timers and focus sessions, calendar, downloads and renders, notifications, clipboard history, system load, mic and camera use, and quick capture.
+Mochi lives at the top of your screen. It follows your ai_assistant Code and Antigravity sessions, and surfaces what is happening on the PC: media, timers and focus sessions, calendar, downloads and renders, notifications, clipboard history, system load, mic and camera use, and quick capture.
 
-Local-first. No telemetry, no account, no cloud service. Keys and the calendar link live in the Windows Credential Manager.
+Local-first. No telemetry, no account. The network is only used for services you connect yourself and the optional Spotify lyrics lookup (lrclib.net). Keys and the calendar link live in the Windows Credential Manager.
 
 ---
 
@@ -12,7 +12,10 @@ Local-first. No telemetry, no account, no cloud service. Keys and the calendar l
 
 | Area | What it does |
 |---|---|
-| **Coding sessions** | Live tool steps, approvals and questions from ai-assistant Code and Antigravity, answered from the island |
+| **Coding sessions** | Cockpit with step timeline, files, context use and last reply; approvals answered from the island |
+| **Assistant** | Local mini agent: reminders, timers, tasks, media, calendar answers, automations, clipboard AI actions, notification digest (Ollama, on-device) |
+| **Command palette** | Apps, projects, maths, conversions, timers, notes, web and system actions |
+| **Screen time** | Per-app active time, weekly chart, daily limits, and a Today recap |
 | **Media** | Now playing from any app, seek, volume and mute |
 | **Focus** | Pomodoro with long breaks, daily stats and streak, break reminders after long stretches at the screen |
 | **Calendar** | Next events from any iCal link, reminders at 30 / 15 / 5 min, one-click join |
@@ -28,6 +31,9 @@ Full list: [docs/FEATURES.md](docs/FEATURES.md).
 
 | Keys | Action |
 |---|---|
+| `Ctrl+Alt+K` | Command palette |
+| `Ctrl+Alt+L` | Lock island (ghost mode, click-through) |
+| `Ctrl+Alt+C` | Pick colour under cursor |
 | `Ctrl+Alt+Space` | Quick capture (falls back to `Ctrl+Alt+N`) |
 | `Ctrl+Alt+W` | Show / hide the island |
 | `Ctrl+Alt+F` | Start, pause or resume a focus session |
@@ -50,13 +56,13 @@ winsle/
 │   ├── src-tauri/            Rust backend
 │   │   └── src/live/         OS pollers: media, system, privacy, progress,
 │   │                         notifications, calendar, capture, extras, tools
-│   ├── hook/                 winsle-hook.exe, the ai-assistant Code relay
+│   ├── hook/                 winsle-hook.exe, the ai_assistant Code relay
 │   ├── sounds/               UI sounds
 │   ├── scripts/              icon generation and packaging
 │   └── dev-preview/          standalone preview pages for `npm run dev`
 ├── scripts/
 │   ├── toggle-winsle.ps1     start / stop (desktop shortcut target)
-│   ├── hooks/                ai-assistant Code and Antigravity hook linking
+│   ├── hooks/                ai_assistant Code and Antigravity hook linking
 │   └── dev/                  screenshot, cursor, hotkey and memory probes
 └── docs/                     architecture, features, building, privacy
 ```

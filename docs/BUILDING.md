@@ -53,7 +53,7 @@ Opens the island in a browser. Bridge calls are no-ops there, so layout and view
   powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "<repo>\scripts\toggle-winsle.ps1"
   ```
 
-- `scripts/hooks/link-hooks.mjs` merges Winsle's hooks into ai-assistant Code and Antigravity, backing up each file first.
+- `scripts/hooks/link-hooks.mjs` merges Winsle's hooks into ai_assistant Code and Antigravity, backing up each file first.
 - `scripts/dev/` has small probes used while developing: `shot.ps1` (screenshot of the top of the screen), `mouse.ps1` (move / click), `keys.ps1` (send `Ctrl+Alt+<key>`), `mem.ps1` (memory of Winsle and its WebView2 processes).
 
 ## Data locations

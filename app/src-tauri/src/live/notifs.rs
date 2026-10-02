@@ -219,6 +219,19 @@ fn friendly_name(app_id: &str) -> String {
         ("screensketch", "Snipping Tool"),
         ("vscode", "VS Code"),
         ("code.exe", "VS Code"),
+        ("powertoys", "PowerToys"),
+        ("nvidia", "NVIDIA"),
+        ("antigravity", "Antigravity"),
+        ("securitycenter", "Windows Security"),
+        ("defender", "Windows Security"),
+        ("creativecloud", "Creative Cloud"),
+        ("acrobat", "Acrobat"),
+        ("powershell", "PowerShell"),
+        ("asussurvey", "ASUS"),
+        ("asuspcassistant", "MyASUS"),
+        ("armourycrate", "Armoury Crate"),
+        ("glidex", "GlideX"),
+        ("platformexperienceshelper", "Windows"),
     ];
     let lower = app_id.to_ascii_lowercase();
     if let Some((_, name)) = KNOWN.iter().find(|(k, _)| lower.contains(k)) {
@@ -231,11 +244,28 @@ fn friendly_name(app_id: &str) -> String {
     let s = s.strip_suffix(".exe").unwrap_or(s);
     let s = s.rsplit('.').next().unwrap_or(s);
     let s = s.strip_suffix("Desktop").filter(|x| !x.is_empty()).unwrap_or(s);
-    if s.is_empty() {
-        app_id.to_string()
-    } else {
-        s.to_string()
+    let s = s.strip_suffix("Win32").filter(|x| !x.is_empty()).unwrap_or(s);
+    if s.is_empty() || s.starts_with('{') {
+        return "Windows".to_string();
     }
+    split_camel(s)
+}
+
+/// "ArmouryCrate" → "Armoury Crate"; acronyms ("NVIDIAApp") stay together.
+fn split_camel(s: &str) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let mut out = String::with_capacity(s.len() + 4);
+    for (i, &c) in chars.iter().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            let prev = chars[i - 1];
+            let next_lower = chars.get(i + 1).is_some_and(|n| n.is_lowercase());
+            if prev.is_lowercase() || (prev.is_uppercase() && next_lower) {
+                out.push(' ');
+            }
+        }
+        out.push(c);
+    }
+    out
 }
 
 fn valid_app_id(id: &str) -> bool {
@@ -274,7 +304,10 @@ mod tests {
         assert_eq!(friendly_name("Microsoft.WindowsTerminal_8wekyb3d8bbwe!App"), "Terminal");
         assert_eq!(friendly_name("MSEdge"), "Edge");
         assert_eq!(friendly_name("Chrome"), "Chrome");
-        assert_eq!(friendly_name("B9ECED6F.ArmouryCrate_qmba6cd70vzyy!App"), "ArmouryCrate");
+        assert_eq!(friendly_name("B9ECED6F.ArmouryCrate_qmba6cd70vzyy!App"), "Armoury Crate");
+        assert_eq!(friendly_name("Microsoft.PowerToysWin32"), "PowerToys");
+        assert_eq!(friendly_name("SomeVendor.CoolAppWin32"), "Cool App");
+        assert_eq!(friendly_name("{1AC14E77-02E7}"), "Windows");
         assert_eq!(friendly_name(r"C:\Tools\Foo.exe"), "Foo");
     }
 

@@ -1,4 +1,4 @@
-// Links Winsle to ai-assistant Code (~/.ai-assistant/settings.json) and Antigravity (~/.gemini/config/hooks.json).
+// Links Winsle to ai_assistant Code (~/.ai_assistant/settings.json) and Antigravity (~/.gemini/config/hooks.json).
 // Run by toggle-winsle.ps1 on every start. Idempotent; backs up (*.bak-winsle-<timestamp>) only before a real change.
 import fs from "node:fs";
 import path from "node:path";
@@ -18,13 +18,13 @@ const save = (f, before, obj) => {
   changed = true;
 };
 
-// ai-assistant Code: same merge as the app's own installer (hooks.rs `merged`).
+// ai_assistant Code: same merge as the app's own installer (hooks.rs `merged`).
 const EVENTS = [
   ["SessionStart", 10], ["SessionEnd", 10], ["UserPromptSubmit", 10], ["PreToolUse", 10],
   ["PostToolUse", 10], ["PostToolUseFailure", 10], ["PermissionRequest", 120], ["Notification", 10],
   ["Stop", 10], ["StopFailure", 10], ["SubagentStart", 10], ["SubagentStop", 10],
 ];
-const cc = path.join(os.homedir(), ".ai-assistant", "settings.json");
+const cc = path.join(os.homedir(), ".ai_assistant", "settings.json");
 const s = load(cc);
 const ccBefore = JSON.stringify(s, null, 2);
 s.hooks ??= {};
@@ -46,4 +46,4 @@ const cmd = (ev) => [{ hooks: [{ type: "command", command: `node "${bridge}" ${e
 h.winsle = { enabled: true, PreToolUse: cmd("PreToolUse"), PostToolUse: cmd("PostToolUse"), Stop: cmd("Stop") };
 save(ag, agBefore, h);
 
-console.log(`${changed ? "Linked" : "Already linked"}.\n  ai-assistant Code: ${cc}\n  Antigravity: ${ag}`);
+console.log(`${changed ? "Linked" : "Already linked"}.\n  ai_assistant Code: ${cc}\n  Antigravity: ${ag}`);

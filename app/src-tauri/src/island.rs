@@ -70,6 +70,8 @@ pub struct PollGate {
     pub rect: Mutex<IslandRect>,
     /// Mirrors the window flag so we only call into Win32 when it changes.
     ignoring: AtomicBool,
+    /// Lock mode: the island never takes the mouse, it only shows.
+    pub locked: AtomicBool,
 }
 
 impl PollGate {
@@ -80,6 +82,7 @@ impl PollGate {
             collapsed: AtomicBool::new(true),
             rect: Mutex::new(IslandRect::default()),
             ignoring: AtomicBool::new(false),
+            locked: AtomicBool::new(false),
         }
     }
 
@@ -90,6 +93,12 @@ impl PollGate {
     /// Forces the next poll tick to re-apply the flag (after a window resize).
     pub fn forget_ignore_state(&self) {
         self.ignoring.store(false, Ordering::Relaxed);
+    }
+
+    /// Records lock mode and the flag the caller just applied to the window.
+    pub fn set_locked(&self, on: bool) {
+        self.locked.store(on, Ordering::Relaxed);
+        self.ignoring.store(on, Ordering::Relaxed);
     }
 
     pub fn set_active(&self, on: bool) {
@@ -349,7 +358,7 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                     && y >= 0.0
                     && y <= size.1;
 
-                let accept = on_island || dragging;
+                let accept = (on_island || dragging) && !gate.locked.load(Ordering::Relaxed);
                 if gate.ignoring.load(Ordering::Relaxed) == accept {
                     gate.ignoring.store(!accept, Ordering::Relaxed);
                     let _ = win.set_ignore_cursor_events(!accept);
@@ -379,6 +388,9 @@ pub fn force_foreground(win: &WebviewWindow) {
     let target = windows::Win32::Foundation::HWND(hwnd.0);
     unsafe {
         let fg = GetForegroundWindow();
+        if fg != target && !fg.is_invalid() {
+            PREV_FOREGROUND.store(fg.0 as isize, std::sync::atomic::Ordering::Relaxed);
+        }
         let fg_thread = GetWindowThreadProcessId(fg, None);
         let me = GetCurrentThreadId();
         let attached = fg_thread != 0 && fg_thread != me && AttachThreadInput(me, fg_thread, true).as_bool();
@@ -386,6 +398,34 @@ pub fn force_foreground(win: &WebviewWindow) {
         if attached {
             let _ = AttachThreadInput(me, fg_thread, false);
         }
+        // Windows refuses SetForegroundWindow to a background process unless it
+        // received the last input. A tap of an unassigned virtual key (0x88) counts
+        // as that input without any app reacting to it (Alt would open menus).
+        if GetForegroundWindow() != target {
+            use windows::Win32::UI::Input::KeyboardAndMouse::{keybd_event, KEYEVENTF_KEYUP};
+            keybd_event(0x88, 0, Default::default(), 0);
+            keybd_event(0x88, 0, KEYEVENTF_KEYUP, 0);
+            let _ = SetForegroundWindow(target);
+        }
+    }
+}
+
+/// The app that was in front before the island took the keyboard.
+static PREV_FOREGROUND: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+
+/// Hands the keyboard back to whatever was in front before `force_foreground`,
+/// so typing after the palette or quick capture closes lands where it should.
+pub fn restore_foreground(win: &WebviewWindow) {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, IsWindow, SetForegroundWindow};
+    let prev = PREV_FOREGROUND.swap(0, std::sync::atomic::Ordering::Relaxed);
+    let Ok(hwnd) = win.hwnd() else { return };
+    unsafe {
+        let me = HWND(hwnd.0);
+        let prev = HWND(prev as *mut core::ffi::c_void);
+        if prev.is_invalid() || GetForegroundWindow() != me || !IsWindow(Some(prev)).as_bool() {
+            return;
+        }
+        let _ = SetForegroundWindow(prev);
     }
 }
 

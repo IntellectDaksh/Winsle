@@ -8,24 +8,27 @@ import type { IslandViewName } from "../core/layout";
 import { h, svg, clear } from "../views/dom";
 import { ICONS } from "../views/icons";
 import type { ViewActions, ViewHost } from "../views/views";
-import { Live, fmtAgo, fmtBytes, fmtClock, fmtRate, fmtTime, fmtUntil, fmtUptime } from "./store";
+import { Live, appColor, fmtAgo, fmtBytes, fmtClock, fmtRate, fmtTime, fmtUntil, fmtUptime } from "./store";
 import type { ProcInfo } from "./types";
+import { buildMoreViews } from "./views2";
+import { buildAgentViews } from "./views3";
+import { Agent } from "./agent";
 
-function shell(...children: Node[]): { el: HTMLElement; body: HTMLElement } {
+export function shell(...children: Node[]): { el: HTMLElement; body: HTMLElement } {
   const body = h("div", { class: "lv-body" }, ...children);
   const el = h("div", { class: "view lv" }, h("div", { class: "card" }, body));
   return { el, body };
 }
 
-function btn(label: string, kind: "primary" | "secondary", onClick: () => void, icon?: string): HTMLElement {
+export function btn(label: string, kind: "primary" | "secondary", onClick: () => void, icon?: string): HTMLElement {
   return h("button", { class: `btn ${kind}`, onclick: onClick }, icon ? svg(icon, 11) : null, h("span", { text: label }));
 }
 
-function roundBtn(icon: string, title: string, onClick: () => void, big = false): HTMLElement {
+export function roundBtn(icon: string, title: string, onClick: () => void, big = false): HTMLElement {
   return h("button", { class: big ? "lv-round big" : "lv-round", title, onclick: onClick }, svg(icon, big ? 16 : 13));
 }
 
-function empty(title: string, sub: string, ...actions: Node[]): HTMLElement {
+export function empty(title: string, sub: string, ...actions: Node[]): HTMLElement {
   return h("div", { class: "lv-empty" },
     h("div", { class: "title", text: title }),
     h("div", { class: "sub", text: sub }),
@@ -468,7 +471,23 @@ function buildNotifs(): ViewHost {
     svg(ICONS.moon, 11), h("span", { text: "Do not disturb" }));
   const clearAll = h("button", { class: "lv-link", text: "Clear all", onclick: () => Live.clearNotifs() });
   const muted = h("div", { class: "lv-muted" });
-  const { el } = shell(h("div", { class: "lv-toolbar" }, count, dnd, clearAll), list, muted);
+  const digest = h("div", { class: "nf-digest" });
+  const digestText = h("span", { class: "t" });
+  const sumBtn = h("button", { class: "lv-link ai", text: "✦ Summarise" });
+  digest.append(digestText, sumBtn);
+  sumBtn.addEventListener("click", async () => {
+    sumBtn.textContent = "Summarising…";
+    digest.classList.add("thinking");
+    try {
+      digestText.textContent = await Agent.digestAi();
+      digest.classList.add("ai");
+    } catch (err) {
+      digestText.textContent = String(err).replace(/^Error:\s*/, "");
+    }
+    digest.classList.remove("thinking");
+    sumBtn.textContent = "✦ Again";
+  });
+  const { el } = shell(h("div", { class: "lv-toolbar" }, count, dnd, clearAll), digest, list, muted);
   let key: string | null = null;
   return {
     el,
@@ -479,7 +498,11 @@ function buildNotifs(): ViewHost {
         ? `${Live.notifs.length} notification${Live.notifs.length > 1 ? "s" : ""}${quiet ? ` · ${quiet}` : ""}`
         : quiet ? `${quiet} · holding toasts` : "Notifications";
       clearAll.style.display = Live.notifs.length ? "" : "none";
-      const k = Live.notifs.map((n) => n.id).join("|") + "#" + Live.mutedApps.join("|");
+      const real = Live.notifs.filter((n) => !n.noise).length;
+      digest.style.display = real >= 3 ? "" : "none";
+      if (real >= 3 && !digest.classList.contains("ai")) digestText.textContent = Agent.digestPlain();
+      if (real < 3) digest.classList.remove("ai");
+      const k = Live.notifs.map((n) => `${n.id}${n.repeats ?? ""}`).join("|") + "#" + Live.mutedApps.join("|");
       if (k === key) return;
       key = k;
       clear(list);
@@ -496,9 +519,11 @@ function buildNotifs(): ViewHost {
           roundBtn(ICONS.xmark, "Dismiss", () => Live.dismissNotif(n.id)));
         acts.addEventListener("click", (e) => e.stopPropagation());
         list.append(h("div", { class: "lv-item lv-notif", role: "button", tabindex: "0", title: `Open ${n.app}`, onclick: () => void Bridge.notifOpen(n.appId) },
-          h("div", { class: "glyph bell" }, svg(ICONS.bell, 12)),
+          h("div", { class: "nf-av", style: `background:${appColor(n.app)}26;color:${appColor(n.app)}`, text: n.app.slice(0, 1).toUpperCase() }),
           h("div", { class: "lv-col" },
-            h("div", { class: "lv-meta" }, h("b", { text: n.app }), h("span", { text: ` · ${fmtTime(n.time)}` })),
+            h("div", { class: "lv-meta" }, h("b", { text: n.app }), h("span", { text: ` · ${fmtAgo(n.time)}` }),
+              n.repeats ? h("span", { class: "nf-rep", text: `×${n.repeats}` }) : null,
+              n.noise ? h("span", { class: "nf-quiet", text: "quiet" }) : null),
             h("div", { class: "lv-name", text: n.title || n.body }),
             n.title && n.body ? h("div", { class: "lv-meta clamp", text: n.body }) : null),
           acts,
@@ -580,15 +605,55 @@ function buildClips(): ViewHost {
   const list = h("div", { class: "lv-list scroll" });
   const title = h("span", { class: "lv-bar-title" });
   const clearBtn = h("button", { class: "lv-link", text: "Clear unpinned", onclick: () => Live.clearClips() });
-  const { el, body } = shell(h("div", { class: "lv-toolbar" }, title, clearBtn), list);
+  const swatches = h("div", { class: "lv-swatches" });
+  // Actions on the selected (default: newest) clip: quick local ones and local-AI ones.
+  let target: string | null = null;
+  const actResult = h("div", { class: "cl-result" });
+  const ACTS: [string, string, boolean][] = [
+    ["summarize", "Summarise", true], ["fix", "Fix grammar", true], ["english", "To English", true], ["bullets", "Bullets", true], ["explain", "Explain", true],
+    ["upper", "UPPER", false], ["lower", "lower", false], ["title", "Title Case", false], ["trim", "Tidy", false], ["json", "Pretty JSON", false], ["slug", "slug", false],
+  ];
+  const acts = h("div", { class: "cl-acts" }, ...ACTS.map(([k, label, ai]) => h("button", {
+    class: ai ? "cl-act ai" : "cl-act",
+    onclick: async () => {
+      const src = target ?? Live.clips[0]?.text;
+      if (!src) return;
+      actResult.className = "cl-result on thinking";
+      actResult.textContent = ai ? "Thinking with local AI…" : "";
+      try {
+        const out = await Agent.transform(k, src);
+        await Live.copyClip(out);
+        actResult.className = "cl-result on";
+        actResult.textContent = out;
+        actResult.title = "Copied — click to copy again";
+        actResult.onclick = () => void Live.copyClip(out);
+      } catch (err) {
+        actResult.className = "cl-result on err";
+        actResult.textContent = k === "json" ? "That isn't valid JSON." : String(err).replace(/^Error:\s*/, "");
+      }
+    },
+  }, ai ? svg(ICONS.sparkle, 9) : null, h("span", { text: label }))));
+  const { el, body } = shell(h("div", { class: "lv-toolbar" }, title, swatches, clearBtn), acts, actResult, list);
+  el.classList.add("cl");
   let key: string | null = null;
   let copied: string | null = null;
+  let colorKey = "";
   return {
     el,
     sync() {
       const clips = Live.clips;
       title.textContent = clips.length ? `Clipboard · ${clips.length}` : "Clipboard";
       clearBtn.style.display = clips.some((c) => !c.pinned) ? "" : "none";
+      acts.style.display = clips.length ? "" : "none";
+      const ck = Live.colors.map((c) => c.hex).join("|");
+      if (ck !== colorKey) {
+        colorKey = ck;
+        swatches.replaceChildren(...Live.colors.map((c) => h("button", {
+          class: "lv-swatch", style: `background:${c.hex}`, title: `${c.hex} — click to copy, right-click to remove`,
+          onclick: () => void Live.copyClip(c.hex),
+          oncontextmenu: (e: Event) => { e.preventDefault(); Live.removeColor(c.hex); },
+        })), ...(Live.colors.length ? [h("span", { class: "lv-meta", text: "Ctrl+Alt+C picks a colour" })] : []));
+      }
       const k = clips.map((c) => `${c.pinned}${c.time}`).join("|") + copied;
       if (k === key) return;
       key = k;
@@ -605,6 +670,7 @@ function buildClips(): ViewHost {
         const row = h("div", {
           class: `lv-item lv-clip${c.pinned ? " pinned" : ""}${copied === c.text ? " copied" : ""}`,
           role: "button", tabindex: "0", title: "Copy again",
+          onmouseenter: () => { target = c.text; },
           onclick: async () => {
             if (!(await Live.copyClip(c.text))) return;
             copied = c.text;
@@ -632,7 +698,7 @@ function buildClips(): ViewHost {
 
 export const LIVE_VIEWS: IslandViewName[] = ["media", "timer", "system", "calendar", "files", "notifs", "capture", "clips"];
 /** Views that need keyboard focus while open. */
-export const TEXT_VIEWS: ReadonlySet<IslandViewName> = new Set(["prompt", "capture"]);
+export const TEXT_VIEWS: ReadonlySet<IslandViewName> = new Set(["prompt", "capture", "palette", "agent"]);
 
 export function buildLiveViews(actions: ViewActions, map: Map<IslandViewName, ViewHost>) {
   map.set("media", buildMedia());
@@ -643,4 +709,6 @@ export function buildLiveViews(actions: ViewActions, map: Map<IslandViewName, Vi
   map.set("notifs", buildNotifs());
   map.set("capture", buildCapture(actions));
   map.set("clips", buildClips());
+  buildMoreViews(actions, map);
+  buildAgentViews(actions, map);
 }

@@ -13,7 +13,11 @@ import { buildChoose, buildUpload, buildUploading } from "./upload";
 import { renderIntegrationCard, type IntegrationCardHooks } from "./integrations";
 import { buildLiveViews } from "../live/views";
 import { Live } from "../live/store";
+import { Dev } from "../live/dev";
+import { Agent } from "../live/agent";
+import { buildDevMini } from "../live/views2";
 import { buildWidget, homeWidgets, type Widget } from "../live/widgets";
+import { fmtDuration } from "../live/dev";
 
 export interface ViewActions {
   setView(v: IslandViewName): void;
@@ -81,27 +85,29 @@ function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElem
 // ── Header ────────────────────────────────────────────────────────────────────
 
 export function buildHeader(actions: ViewActions): ViewHost {
-  const tabHome = h("button", { class: "tab", title: "Overview", onclick: () => go("overview") }, svg(ICONS.house, 13));
-  const tabChat = h("button", { class: "tab", title: "Ask", onclick: () => go("prompt") }, svg(ICONS.bubble, 13));
-  const tabDrop = h("button", { class: "tab", title: "Drop", onclick: () => go("upload") }, svg(ICONS.plus, 13));
+  const tabHome = h("button", { class: "tab", "data-tip": "Overview", "aria-label": "Overview", onclick: () => go("overview") }, svg(ICONS.house, 13));
+  const tabChat = h("button", { class: "tab", "data-tip": "Ask", "aria-label": "Ask", onclick: () => go("prompt") }, svg(ICONS.bubble, 13));
+  const tabDrop = h("button", { class: "tab", "data-tip": "Drop", "aria-label": "Drop", onclick: () => go("upload") }, svg(ICONS.plus, 13));
 
+  // The everyday five stay one click away; the rest live behind "More".
   const liveTabs: [IslandViewName, string, string][] = [
+    ["agent", ICONS.sparkle, "Assistant"],
+    ["dev", ICONS.code, "Coding"],
     ["media", ICONS.music, "Now playing"],
     ["timer", ICONS.timer, "Timer"],
     ["calendar", ICONS.calendar, "Calendar"],
-    ["files", ICONS.download, "Downloads & renders"],
     ["notifs", ICONS.bell, "Notifications"],
-    ["system", ICONS.chip, "System"],
-    ["capture", ICONS.pencil, "Quick capture"],
-    ["clips", ICONS.clipboard, "Clipboard history (Ctrl+Alt+V)"],
+    ["more", ICONS.grid, "More"],
   ];
-  const liveBtns = liveTabs.map(([v, icon, title]) => {
-    const b = h("button", { class: "tab", title, onclick: () => go(v) }, svg(icon, 13), h("i", { class: "tab-dot" }));
+  const liveBtns = liveTabs.map(([v, icon, tip]) => {
+    const b = h("button", { class: "tab", "data-tip": tip, "aria-label": tip, onclick: () => go(v) }, svg(icon, 13), h("i", { class: "tab-dot" }));
     return { v, b };
   });
 
-  const gearBtn = h("button", { title: "Settings", onclick: () => go("settings") }, svg(ICONS.gear, 14));
-  const soundBtn = h("button", { title: "Mute", onclick: () => actions.toggleSound() }, svg(ICONS.speakerOn, 14));
+  const gearBtn = h("button", { "data-tip": "Settings", "aria-label": "Settings", onclick: () => go("settings") }, svg(ICONS.gear, 14));
+  const searchBtn = h("button", { "data-tip": "Search · Ctrl+Alt+K", "aria-label": "Command palette", onclick: () => go("palette") }, svg(ICONS.search, 13));
+  const lockBtn = h("button", { "data-tip": "Ghost mode · Ctrl+Alt+L", "aria-label": "Lock island", onclick: () => window.dispatchEvent(new CustomEvent("winsle-lock")) }, svg(ICONS.lock, 13));
+  const soundBtn = h("button", { "data-tip": "Sound", "aria-label": "Mute", onclick: () => actions.toggleSound() }, svg(ICONS.speakerOn, 14));
 
   function go(v: IslandViewName) {
     actions.blip();
@@ -113,7 +119,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
     { id: "header" },
     h("div", { class: "tabs" }, tabHome, tabChat, tabDrop),
     h("div", { class: "tabs live-tabs" }, ...liveBtns.map((x) => x.b)),
-    h("div", { class: "header-actions" }, gearBtn, soundBtn),
+    h("div", { class: "header-actions" }, searchBtn, lockBtn, gearBtn, soundBtn),
   );
 
   return {
@@ -132,9 +138,13 @@ export function buildHeader(actions: ViewActions): ViewHost {
         notifs: Live.notifs.length > 0,
         system: !!Live.sysAlert(),
         capture: Live.tasks.some((t) => !t.done),
+        dev: !!Dev.session && (Dev.session.status === "working" || Dev.session.status === "thinking" || Dev.session.status === "waiting"),
       };
+      // "More" lights up when something behind it is happening.
+      busy.agent = Agent.reminders.some((r) => r.at - Date.now() < 15 * 60_000);
+      busy.more = Live.activeDownloads().length > 0 || !!Live.sysAlert() || Live.tasks.some((t) => !t.done);
       for (const { v: lv, b } of liveBtns) {
-        b.classList.toggle("on", v === lv);
+        b.classList.toggle("on", v === lv || (lv === "more" && MORE_VIEWS.has(v)));
         b.classList.toggle("busy", !!busy[lv]);
       }
       // Unread count on the bell instead of a plain dot.
@@ -143,6 +153,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
       bell.dataset.count = n ? (n > 9 ? "9+" : String(n)) : "";
       bell.classList.toggle("quiet", !!Live.quietReason());
       gearBtn.classList.toggle("on", v === "settings");
+      searchBtn.classList.toggle("on", v === "palette");
       clear(gearBtn);
       gearBtn.append(svg(v === "settings" ? ICONS.gearFill : ICONS.gear, 14));
       clear(soundBtn);
@@ -152,6 +163,8 @@ export function buildHeader(actions: ViewActions): ViewHost {
   };
 }
 
+const MORE_VIEWS: ReadonlySet<IslandViewName> = new Set(["more", "today", "usage", "files", "system", "capture", "clips"]);
+
 // ── Overview ──────────────────────────────────────────────────────────────────
 
 function buildOverview(actions: ViewActions): ViewHost {
@@ -159,6 +172,7 @@ function buildOverview(actions: ViewActions): ViewHost {
   const who = h("div", { class: "who" });
   const tickerBody = h("div", { class: "card-body" }, who, ticker.el);
   const leftBody = h("div", { class: "left-body" });
+  const devMini = buildDevMini(() => actions.setView("dev"));
   const jump = h(
     "button",
     { class: "icon-btn jump", title: "Open", onclick: () => actions.openTarget() },
@@ -179,7 +193,7 @@ function buildOverview(actions: ViewActions): ViewHost {
   let pillIds = "";
   let detailOpen = false;
   let lastFocus: string | null = null;
-  let mode: "ticker" | "card" | null = null;
+  let mode: "ticker" | "card" | "dev" | null = null;
   let cardKey = "";
 
   const hooks: IntegrationCardHooks = {
@@ -223,13 +237,21 @@ function buildOverview(actions: ViewActions): ViewHost {
         mode = null;
       }
 
-      // VS Code with a live ai-assistant Code session keeps the ticker; every other
+      // VS Code with a live ai_assistant Code session keeps the ticker; every other
       // pill shows its own card, exactly like IntegrationCardView.
       const sessionActive =
-        task?.id === "integration_ai-assistant" && (task.state !== "idle" || task.steps.length > 0);
+        task?.id === "integration_ai_assistant" && (task.state !== "idle" || task.steps.length > 0);
 
       if (task && sessionActive) {
-        if (mode !== "ticker") {
+        if (Dev.session) {
+          if (mode !== "dev") {
+            clear(leftBody);
+            leftBody.append(devMini.el);
+            mode = "dev";
+            cardKey = "";
+          }
+          devMini.sync();
+        } else if (mode !== "ticker") {
           clear(leftBody);
           leftBody.append(tickerBody);
           mode = "ticker";
@@ -239,7 +261,7 @@ function buildOverview(actions: ViewActions): ViewHost {
         who.append(
           dot(task.color, 7),
           h("span", { class: "name", text: task.name }),
-          h("span", { class: "tool", text: task.source === "ai-assistantCode" ? "ai-assistant Code" : "n8n" }),
+          h("span", { class: "tool", text: task.source === "ai_assistantCode" ? "ai_assistant Code" : "n8n" }),
         );
         if (task.steps.length > 1) {
           who.append(h("span", {
@@ -278,7 +300,7 @@ function buildOverview(actions: ViewActions): ViewHost {
 }
 
 function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {
-  const label = task.id === "integration_ai-assistant" ? "VS Code" : task.name;
+  const label = task.id === "integration_ai_assistant" ? "VS Code" : task.name;
   const canvas = createMiniBot(task, 24);
   const pill = h(
     "div",
@@ -332,7 +354,7 @@ function buildEmpty(actions: ViewActions): ViewHost {
       h("div", { class: "sub", text: "Drop a file or window, or ask me anything." }),
     ),
     h("div", { class: "grow" }),
-    btn("Ask ai-assistant", "primary", () => actions.setView("prompt")),
+    btn("Ask ai_assistant", "primary", () => actions.setView("prompt")),
   );
   return { el: h("div", { class: "view" }, card(null, body)), sync() {} };
 }
@@ -379,9 +401,9 @@ function buildQuestion(): ViewHost {
     el,
     sync() {
       clear(who);
-      who.append(agentWho(State.focusTask, "ai-assistant Code is asking a question"));
+      who.append(agentWho(State.focusTask, "ai_assistant Code is asking a question"));
       const task = State.focusTask;
-      title.textContent = task?.steps.at(-1) ?? "ai-assistant needs an answer.";
+      title.textContent = task?.steps.at(-1) ?? "ai_assistant needs an answer.";
       clear(row);
       row.append(h("div", { class: "sub", text: "Answer in your terminal — Winsle can't reply for you yet." }));
     },
@@ -394,9 +416,11 @@ function buildError(actions: ViewActions): ViewHost {
   const who = h("div");
   const title = h("div", { class: "title", text: "Workflow stopped." });
   const detail = h("div", { class: "detail" });
-  const row = h("div", { class: "actions" },
-    btn("Retry", "primary", () => actions.setView(State.defaultView())),
-    btn("Open in n8n", "secondary", () => actions.openUrl("")),
+  const retry = btn("Retry", "primary", () => actions.setView(State.defaultView()));
+  const n8nBtn = btn("Open in n8n", "secondary", () => actions.openUrl(""));
+  const detailsBtn = btn("Details", "primary", () => actions.setView("dev"));
+  const row = h("div", { class: "actions" }, retry, n8nBtn, detailsBtn,
+    btn("Open terminal", "secondary", () => actions.openTerminal()),
   );
   const el = h("div", { class: "view" }, card("red", stack(116, 16, who, title, detail, row)));
   return {
@@ -404,9 +428,13 @@ function buildError(actions: ViewActions): ViewHost {
     sync() {
       const task = State.focusTask;
       clear(who);
-      who.append(agentWho(task, task?.source === "n8n" ? "n8n" : "ai-assistant Code"));
-      title.textContent = task?.source === "n8n" ? "Workflow stopped." : "Session stopped on an error.";
-      detail.textContent = task?.steps.at(-1) ?? "No detail available.";
+      who.append(agentWho(task, task?.source === "n8n" ? "n8n" : "ai_assistant Code"));
+      const isN8n = task?.source === "n8n";
+      title.textContent = isN8n ? "Workflow stopped." : "Session stopped on an error.";
+      const failed = Dev.session?.steps.filter((x) => x.failed).at(-1);
+      detail.textContent = !isN8n && failed ? `${failed.label} · ${failed.detail}` : task?.steps.at(-1) ?? "No detail available.";
+      retry.style.display = n8nBtn.style.display = isN8n ? "" : "none";
+      detailsBtn.style.display = isN8n ? "none" : "";
     },
   };
 }
@@ -418,6 +446,7 @@ function buildFinished(actions: ViewActions): ViewHost {
   const title = h("div", { class: "title" });
   const row = h("div", { class: "actions" },
     btn("Open terminal", "primary", () => actions.openTerminal()),
+    btn("Details", "secondary", () => actions.setView("dev")),
     btn("OK", "secondary", () => actions.collapse()),
   );
   const el = h("div", { class: "view" }, card("green", stack(116, 16, who, title, row)));
@@ -425,8 +454,10 @@ function buildFinished(actions: ViewActions): ViewHost {
     el,
     sync() {
       clear(who);
-      who.append(agentWho(State.focusTask, "ai-assistant Code finished"));
-      title.textContent = State.focusTask?.steps.at(-1) ?? "Session finished";
+      const s = Dev.session;
+      who.append(agentWho(State.focusTask, s ? `finished in ${fmtDuration(Dev.elapsed())}` : "ai_assistant Code finished"));
+      title.textContent = s?.stats?.lastText?.split(/\n+/).find((l) => l.trim()) ?? (s ? `${s.steps.length} steps · ${s.files.size} files changed` : "Session finished");
+      title.title = s?.stats?.lastText ?? "";
     },
   };
 }
@@ -468,7 +499,7 @@ function buildSettings(actions: ViewActions): ViewHost {
   const segButtons = [4, 6, 10].map((s) =>
     h("button", { onclick: () => actions.setAutoClose(s) }, `${s}s`),
   );
-  const ai-assistantBadge = h("span", { class: "status-badge" });
+  const ai_assistantBadge = h("span", { class: "status-badge" });
   const apiBadge = h("span", { class: "status-badge" });
 
   const rows = h(
@@ -485,7 +516,7 @@ function buildSettings(actions: ViewActions): ViewHost {
     h(
       "div",
       { class: "settings-row", style: "gap:14px" },
-      ai-assistantBadge,
+      ai_assistantBadge,
       apiBadge,
       h("div", { class: "grow" }),
       h("button", {
@@ -509,10 +540,10 @@ function buildSettings(actions: ViewActions): ViewHost {
       volume.style.opacity = s.soundEnabled ? "1" : "0.4";
       autoLabel.textContent = `Auto-close · ${Math.round(s.autoCloseInterval)}s`;
       segButtons.forEach((b, i) => b.classList.toggle("on", s.autoCloseInterval === [4, 6, 10][i]));
-      clear(ai-assistantBadge);
-      ai-assistantBadge.append(
+      clear(ai_assistantBadge);
+      ai_assistantBadge.append(
         dot(s.hooksInstalled ? "#22C55E" : "#F4505E", 6),
-        h("span", { text: "ai-assistant Code" }),
+        h("span", { text: "ai_assistant Code" }),
       );
       clear(apiBadge);
       apiBadge.append(dot("#F4505E", 6), h("span", { text: "API" }));
@@ -554,7 +585,7 @@ export function buildViews(
   map.set("choose", buildChoose(actions));
   // Not in the Windows v1: sending a file by email, window attach + web result.
   map.set("mail", buildPlaceholder("Sending by email isn't in this version.", ""));
-  map.set("searching", buildPlaceholder("ai-assistant is searching…", ""));
+  map.set("searching", buildPlaceholder("ai_assistant is searching…", ""));
   map.set("result", buildPlaceholder("Result", ""));
   buildLiveViews(actions, map);
   return map;
