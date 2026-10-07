@@ -1,20 +1,8 @@
-# Starts Winsle if it is not running, stops it if it is.
-# Meant for a desktop shortcut:
-#   powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "<repo>\scripts\toggle-winsle.ps1"
-$root = Split-Path $PSScriptRoot -Parent
-$exe = Join-Path $root 'app\target\release\winsle.exe'
-$running = Get-Process winsle -ErrorAction SilentlyContinue
+﻿$exe = "D:\Project X\winsle\app\target\release\winsle.exe"
 Add-Type -AssemblyName System.Windows.Forms
-if ($running) {
-    $running | Stop-Process -Force
-    # Force-kill skips WebView2 shutdown, so its helper processes would linger.
-    Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" |
-        Where-Object { $_.CommandLine -match 'com\.winsle\.app' } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-} elseif (Test-Path $exe) {
-    # Re-link ai_assistant Code (terminal + VS Code) and Antigravity on every start; no-op when already linked.
-    node (Join-Path $PSScriptRoot 'hooks\link-hooks.mjs') | Out-Null
-    Start-Process $exe
-} else {
-    [System.Windows.Forms.MessageBox]::Show("Not built yet:`n$exe", 'Winsle') | Out-Null
-}
+$p = Get-Process winsle -ErrorAction SilentlyContinue
+if ($p) { $p | Stop-Process -Force; $msg = "Winsle stopped" }
+else { Start-Process $exe -WorkingDirectory (Split-Path $exe); $msg = "Winsle started" }
+$n = New-Object System.Windows.Forms.NotifyIcon
+$n.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon($exe); $n.Visible = $true
+$n.ShowBalloonTip(2000, "Winsle", $msg, "Info"); Start-Sleep 3; $n.Dispose()
