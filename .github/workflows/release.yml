@@ -49,6 +49,7 @@ jobs:
           workspaces: app
 
       - run: npm ci
+      - run: cargo build --release -p winsle-hook
       - run: cargo test --release --lib
         working-directory: app/src-tauri
 

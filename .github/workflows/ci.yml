@@ -29,5 +29,6 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npx vite build
+      - run: cargo build --release -p winsle-hook
       - run: cargo test --release --lib
         working-directory: app/src-tauri
