@@ -6,6 +6,9 @@ app/target/
 app/dist/
 app/release/
 app/src-tauri/gen/schemas/
+target/
+dist/
+release/
 
 # Local / editor
 *.log
@@ -13,8 +16,22 @@ app/src-tauri/gen/schemas/
 .idea/
 .DS_Store
 Thumbs.db
+*.tsbuildinfo
 
-# Local secrets — never committed
+# Local secrets, environment variables, credentials — never committed
 .env
 .env.*
+*.env
+*.env.*
 !.env.example
+*.pem
+*.key
+*.pk8
+*.p12
+*.pfx
+*.cer
+*.crt
+*credentials*.json
+*client_secret*.json
+*token*.json
+*.kdbx
