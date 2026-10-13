@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0
+## 1.0.0
 
 ### Added
 - Account sign-in: Spotify, Google Calendar, and Outlook OAuth PKCE sign-in with local token persistence in Windows Credential Manager.

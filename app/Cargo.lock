@@ -5473,7 +5473,7 @@ dependencies = [
 
 [[package]]
 name = "winsle"
-version = "0.4.0"
+version = "1.0.0"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.3.4",
@@ -5497,7 +5497,7 @@ dependencies = [
 
 [[package]]
 name = "winsle-hook"
-version = "0.4.0"
+version = "1.0.0"
 dependencies = [
  "serde_json",
  "windows 0.61.3",
