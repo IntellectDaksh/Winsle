@@ -1,4 +1,8 @@
 $candidates = @(
+    (Join-Path $env:LOCALAPPDATA "Programs\Winsle\winsle.exe"),
+    (Join-Path $env:ProgramFiles "Winsle\winsle.exe"),
+    (Join-Path $PSScriptRoot "..\winsle.exe"),
+    (Join-Path $PSScriptRoot "winsle.exe"),
     (Join-Path $PSScriptRoot "..\app\target\release\winsle.exe"),
     (Join-Path $env:LOCALAPPDATA "Winsle\bin\winsle.exe"),
     "D:\Project X\winsle\app\target\release\winsle.exe",
