@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "icons": "node scripts/gen-icons.mjs",
+    "test:calc": "node scripts/test-calc.mjs",
     "tauri": "tauri",
     "predev": "cargo build --release -p winsle-hook",
     "prebuild": "cargo build --release -p winsle-hook",
