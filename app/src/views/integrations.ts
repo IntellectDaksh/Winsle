@@ -57,14 +57,14 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
   const info = State.integrations[task.id];
   const configured = info?.configured ?? false;
   const error = info?.error ?? null;
-  // The ai_assistant Code pill is about hooks, not a key — the macOS wording would be
+  // The Claude Code pill is about hooks, not a key — the macOS wording would be
   // misleading here.
-  const missing = task.id === "integration_ai_assistant" ? "Hooks not installed" : "Key not configured";
+  const missing = task.id === "integration_claude" ? "Hooks not installed" : "Key not configured";
   const label = error ?? (configured ? "Connected · loading…" : missing);
   const statusColor = error || !configured ? "#F4505E" : "#22C55E";
 
   const actions = h("div", { class: "int-actions" });
-  if (task.id === "integration_ai_assistant") {
+  if (task.id === "integration_claude") {
     actions.append(
       h("button", {
         class: "link-btn",
@@ -110,7 +110,7 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
   return h(
     "div",
     { class: "int-card" },
-    header(task.color, task.id === "integration_ai_assistant" ? "VS Code" : task.name, "Integration"),
+    header(task.color, task.id === "integration_claude" ? "VS Code" : task.name, "Integration"),
     h("div", { class: "int-status" }, dot(statusColor, 5), h("span", { text: label })),
     actions,
   );

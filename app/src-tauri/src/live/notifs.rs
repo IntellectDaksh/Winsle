@@ -125,6 +125,15 @@ pub fn spawn(app: AppHandle) {
                 }
             };
             logged = false;
+            // Windows trims or recreates the db (cleanup, profile reset): ids
+            // restart lower and `Id > after` would never match again.
+            if rows.is_empty() {
+                if let Ok(max) = max_id(c) {
+                    if max < after {
+                        last_id = Some(max);
+                    }
+                }
+            }
             for row in rows {
                 last_id = Some(row.id);
                 if crate::live::paused() {

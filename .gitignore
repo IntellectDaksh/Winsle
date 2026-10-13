@@ -13,3 +13,8 @@ app/src-tauri/gen/schemas/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local secrets — never committed
+.env
+.env.*
+!.env.example

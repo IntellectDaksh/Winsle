@@ -8,7 +8,7 @@ edition = "2021"
 license = "MIT"
 
 # Release profile shared by the app and the hook relay: the hook must start fast
-# (ai_assistant Code spawns it on every event), so we optimise for size and speed.
+# (Claude Code spawns it on every event), so we optimise for size and speed.
 [profile.release]
 opt-level = "s"
 # Thin LTO: full LTO needs several GB and stalls for 30+ min on a loaded 16 GB machine.

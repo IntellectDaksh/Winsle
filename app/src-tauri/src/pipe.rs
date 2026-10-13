@@ -5,7 +5,7 @@
 // that keeps its connection open: it waits for the island's decision and writes
 // it back on the same pipe, which is how approving from the island works.
 //
-// ai_assistant Code is never blocked by us. Three things guarantee it:
+// Claude Code is never blocked by us. Three things guarantee it:
 //   * winsle-hook gives the connection 300 ms and exits cleanly if we are closed;
 //   * we only wait for a human once the island has *confirmed* the card is on
 //     screen, so a paused island or a webview that is not listening costs a few
@@ -15,7 +15,7 @@
 //
 // What we write back is the bare word `allow` or `deny`. Turning that into the
 // documented hookSpecificOutput JSON is winsle-hook's job, so the wire format
-// ai_assistant Code expects lives in exactly one place.
+// Claude Code expects lives in exactly one place.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -35,7 +35,7 @@ use crate::log;
 const DECISION_TIMEOUT: Duration = Duration::from_secs(108);
 /// How long the island gets to say "the card is up". This is the whole of B4:
 /// without it, an island that is paused, hidden behind a crashed webview or
-/// simply not listening would leave ai_assistant Code staring at a prompt nobody can
+/// simply not listening would leave Claude Code staring at a prompt nobody can
 /// see for nearly two minutes.
 const ACK_TIMEOUT: Duration = Duration::from_millis(800);
 const MAX_PAYLOAD: usize = 1 << 20;
@@ -146,7 +146,7 @@ async fn handle(app: AppHandle, mut pipe: NamedPipeServer) {
     app.state::<Pending>().0.lock().unwrap().remove(&id);
 
     // No decision: say nothing at all. winsle-hook then writes nothing to stdout
-    // and ai_assistant Code asks in the terminal, exactly as if Winsle were closed.
+    // and Claude Code asks in the terminal, exactly as if Winsle were closed.
     if let Some(d) = decision {
         let _ = pipe.write_all(format!("{d}\n").as_bytes()).await;
         let _ = pipe.flush().await;
@@ -216,7 +216,7 @@ pub fn decline(app: &AppHandle, request_id: &str) {
 }
 
 /// Called by the island's Allow / Deny buttons. Only ever a bare word: turning
-/// it into ai_assistant Code's JSON is winsle-hook's job.
+/// it into Claude Code's JSON is winsle-hook's job.
 pub fn answer(app: &AppHandle, request_id: &str, decision: &str) {
     let word = match decision {
         "allow" | "always" => "allow",

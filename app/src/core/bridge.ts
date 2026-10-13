@@ -64,12 +64,12 @@ export const Bridge = {
   /** Writes to %LOCALAPPDATA%\Winsle\winsle.log, next to the Rust lines. */
   log: (message: string) => call<void>("log_line", { message }),
 
-  // ── ai_assistant Code hooks ─────────────────────────────────────────────────────
+  // ── Claude Code hooks ─────────────────────────────────────────────────────
   hooksStatus: () => call<HookStatus>("hooks_status"),
   /** Diff to show before anything is written. `install: false` previews removal. */
   hooksPreview: (install: boolean) => callOrThrow<HookPreview>("hooks_preview", { install }),
   /**
-   * Writes ~/.ai_assistant/settings.json — only ever after an explicit click, and only
+   * Writes ~/.claude/settings.json — only ever after an explicit click, and only
    * when the file still matches the preview the user looked at.
    */
   hooksApply: (install: boolean, fingerprint: string) =>
@@ -79,7 +79,7 @@ export const Bridge = {
     call<void>("approval_decision", { requestId, decision }),
   /** "The card is up" — until this lands the relay only waits a moment. */
   approvalAck: (requestId: string) => call<void>("approval_ack", { requestId }),
-  /** "Nobody can act on this" — ai_assistant Code asks in the terminal right away. */
+  /** "Nobody can act on this" — Claude Code asks in the terminal right away. */
   approvalDecline: (requestId: string) => call<void>("approval_decline", { requestId }),
 
   // ── Chat, files, secrets ──────────────────────────────────────────────────
@@ -139,6 +139,11 @@ export const Bridge = {
     call<string | null>("lyrics_get", { artist, title, album, duration }),
   usageToday: () => call<AppUsage[]>("usage_today"),
   usageDays: (days: number) => call<DayUsage[]>("usage_days", { days }),
+  usageTop: (days: number) => call<AppUsage[]>("usage_top", { days }),
+  focusGuardSet: (active: boolean, apps: string[], sites: string[]) => call<void>("focus_guard_set", { active, apps, sites }),
+  focusGuardAllow: (minutes: number) => call<void>("focus_guard_allow", { minutes }),
+  distractDays: (days: number) => call<DayUsage[]>("distract_days", { days }),
+  distractTop: (days: number) => call<AppUsage[]>("distract_top", { days }),
   appsList: () => call<AppEntry[]>("apps_list"),
   appLaunch: (path: string) => callOrThrow<void>("app_launch", { path }),
   systemAction: (action: "lock" | "snip" | "settings" | "taskmgr") => callOrThrow<void>("system_action", { action }),

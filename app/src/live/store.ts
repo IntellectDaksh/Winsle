@@ -135,8 +135,8 @@ class LiveStore {
   volume: VolumeInfo | null = null;
   /** Notifications that arrived while a Focus timer ran — summarised after. */
   private heldDuringFocus = 0;
-  /** When the current ai_assistant Code burst of activity began (performance.now()). */
-  ai_assistantSince: number | null = null;
+  /** When the current Claude Code burst of activity began (performance.now()). */
+  claudeSince: number | null = null;
   private open: Opener = () => {};
   private reveal: () => void = () => {};
 
@@ -708,6 +708,9 @@ class LiveStore {
     });
 
     void onEvent<null>("island-toggle", () => toggle());
+    // Generic one-off message from the backend (updater, etc.).
+    void onEvent<{ title: string; sub: string }>("live-flash", (f) =>
+      this.setFlash({ icon: "bell", color: "#A5B4FC", title: f.title, sub: f.sub, view: "notifs" }, 8000));
 
     // Ctrl+Alt+F: start a focus session, or pause/resume the one running.
     void onEvent<null>("hotkey-focus", () => {

@@ -22,8 +22,14 @@ pub struct AiStatus {
     pub models: Vec<String>,
 }
 
-fn client(timeout: Duration) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder().timeout(timeout).build().map_err(|e| e.to_string())
+/// One shared client (pooled connections) instead of a new one per call; timeouts are per request.
+fn client() -> Result<&'static reqwest::Client, String> {
+    static C: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    if let Some(c) = C.get() {
+        return Ok(c);
+    }
+    let c = reqwest::Client::builder().build().map_err(|e| e.to_string())?;
+    Ok(C.get_or_init(|| c))
 }
 
 fn app_path() -> Option<PathBuf> {
@@ -33,7 +39,7 @@ fn app_path() -> Option<PathBuf> {
 }
 
 async fn models() -> Option<Vec<String>> {
-    let v: Value = client(Duration::from_millis(1500)).ok()?.get(format!("{BASE}/api/tags")).send().await.ok()?.json().await.ok()?;
+    let v: Value = client().ok()?.get(format!("{BASE}/api/tags")).timeout(Duration::from_millis(1500)).send().await.ok()?.json().await.ok()?;
     Some(
         v["models"]
             .as_array()?
@@ -92,8 +98,9 @@ pub async fn ai_chat(model: String, system: String, prompt: String, json: bool) 
     if json {
         body["format"] = json!("json");
     }
-    let resp = client(Duration::from_secs(90))?
+    let resp = client()?
         .post(format!("{BASE}/api/chat"))
+        .timeout(Duration::from_secs(90))
         .json(&body)
         .send()
         .await

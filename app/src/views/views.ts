@@ -237,10 +237,10 @@ function buildOverview(actions: ViewActions): ViewHost {
         mode = null;
       }
 
-      // VS Code with a live ai_assistant Code session keeps the ticker; every other
+      // VS Code with a live Claude Code session keeps the ticker; every other
       // pill shows its own card, exactly like IntegrationCardView.
       const sessionActive =
-        task?.id === "integration_ai_assistant" && (task.state !== "idle" || task.steps.length > 0);
+        task?.id === "integration_claude" && (task.state !== "idle" || task.steps.length > 0);
 
       if (task && sessionActive) {
         if (Dev.session) {
@@ -261,7 +261,7 @@ function buildOverview(actions: ViewActions): ViewHost {
         who.append(
           dot(task.color, 7),
           h("span", { class: "name", text: task.name }),
-          h("span", { class: "tool", text: task.source === "ai_assistantCode" ? "ai_assistant Code" : "n8n" }),
+          h("span", { class: "tool", text: task.source === "claudeCode" ? "Claude Code" : "n8n" }),
         );
         if (task.steps.length > 1) {
           who.append(h("span", {
@@ -300,7 +300,7 @@ function buildOverview(actions: ViewActions): ViewHost {
 }
 
 function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {
-  const label = task.id === "integration_ai_assistant" ? "VS Code" : task.name;
+  const label = task.id === "integration_claude" ? "VS Code" : task.name;
   const canvas = createMiniBot(task, 24);
   const pill = h(
     "div",
@@ -354,7 +354,7 @@ function buildEmpty(actions: ViewActions): ViewHost {
       h("div", { class: "sub", text: "Drop a file or window, or ask me anything." }),
     ),
     h("div", { class: "grow" }),
-    btn("Ask ai_assistant", "primary", () => actions.setView("prompt")),
+    btn("Ask Claude", "primary", () => actions.setView("prompt")),
   );
   return { el: h("div", { class: "view" }, card(null, body)), sync() {} };
 }
@@ -401,9 +401,9 @@ function buildQuestion(): ViewHost {
     el,
     sync() {
       clear(who);
-      who.append(agentWho(State.focusTask, "ai_assistant Code is asking a question"));
+      who.append(agentWho(State.focusTask, "Claude Code is asking a question"));
       const task = State.focusTask;
-      title.textContent = task?.steps.at(-1) ?? "ai_assistant needs an answer.";
+      title.textContent = task?.steps.at(-1) ?? "Claude needs an answer.";
       clear(row);
       row.append(h("div", { class: "sub", text: "Answer in your terminal — Winsle can't reply for you yet." }));
     },
@@ -428,7 +428,7 @@ function buildError(actions: ViewActions): ViewHost {
     sync() {
       const task = State.focusTask;
       clear(who);
-      who.append(agentWho(task, task?.source === "n8n" ? "n8n" : "ai_assistant Code"));
+      who.append(agentWho(task, task?.source === "n8n" ? "n8n" : "Claude Code"));
       const isN8n = task?.source === "n8n";
       title.textContent = isN8n ? "Workflow stopped." : "Session stopped on an error.";
       const failed = Dev.session?.steps.filter((x) => x.failed).at(-1);
@@ -455,7 +455,7 @@ function buildFinished(actions: ViewActions): ViewHost {
     sync() {
       clear(who);
       const s = Dev.session;
-      who.append(agentWho(State.focusTask, s ? `finished in ${fmtDuration(Dev.elapsed())}` : "ai_assistant Code finished"));
+      who.append(agentWho(State.focusTask, s ? `finished in ${fmtDuration(Dev.elapsed())}` : "Claude Code finished"));
       title.textContent = s?.stats?.lastText?.split(/\n+/).find((l) => l.trim()) ?? (s ? `${s.steps.length} steps · ${s.files.size} files changed` : "Session finished");
       title.title = s?.stats?.lastText ?? "";
     },
@@ -499,7 +499,7 @@ function buildSettings(actions: ViewActions): ViewHost {
   const segButtons = [4, 6, 10].map((s) =>
     h("button", { onclick: () => actions.setAutoClose(s) }, `${s}s`),
   );
-  const ai_assistantBadge = h("span", { class: "status-badge" });
+  const claudeBadge = h("span", { class: "status-badge" });
   const apiBadge = h("span", { class: "status-badge" });
 
   const rows = h(
@@ -516,7 +516,7 @@ function buildSettings(actions: ViewActions): ViewHost {
     h(
       "div",
       { class: "settings-row", style: "gap:14px" },
-      ai_assistantBadge,
+      claudeBadge,
       apiBadge,
       h("div", { class: "grow" }),
       h("button", {
@@ -540,10 +540,10 @@ function buildSettings(actions: ViewActions): ViewHost {
       volume.style.opacity = s.soundEnabled ? "1" : "0.4";
       autoLabel.textContent = `Auto-close · ${Math.round(s.autoCloseInterval)}s`;
       segButtons.forEach((b, i) => b.classList.toggle("on", s.autoCloseInterval === [4, 6, 10][i]));
-      clear(ai_assistantBadge);
-      ai_assistantBadge.append(
+      clear(claudeBadge);
+      claudeBadge.append(
         dot(s.hooksInstalled ? "#22C55E" : "#F4505E", 6),
-        h("span", { text: "ai_assistant Code" }),
+        h("span", { text: "Claude Code" }),
       );
       clear(apiBadge);
       apiBadge.append(dot("#F4505E", 6), h("span", { text: "API" }));
@@ -585,7 +585,7 @@ export function buildViews(
   map.set("choose", buildChoose(actions));
   // Not in the Windows v1: sending a file by email, window attach + web result.
   map.set("mail", buildPlaceholder("Sending by email isn't in this version.", ""));
-  map.set("searching", buildPlaceholder("ai_assistant is searching…", ""));
+  map.set("searching", buildPlaceholder("Claude is searching…", ""));
   map.set("result", buildPlaceholder("Result", ""));
   buildLiveViews(actions, map);
   return map;

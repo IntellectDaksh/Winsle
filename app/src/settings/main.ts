@@ -1,5 +1,5 @@
 // Settings window — the place where anything that writes to disk is confirmed.
-// Stage 2 covers the ai_assistant Code hooks and the general preferences; API keys and
+// Stage 2 covers the Claude Code hooks and the general preferences; API keys and
 // integrations land here too in a later stage.
 
 import "./settings.css";
@@ -8,6 +8,11 @@ import { DEFAULT_SETTINGS, type Settings } from "../core/state";
 import { h, clear } from "../views/dom";
 import { DEFAULT_HOME_WIDGETS, WIDGET_LABELS } from "../live/widgets";
 import { prefs, save as savePref, setPrefs } from "../live/prefs";
+import { calendarAccountRows } from "../live/calendar-actions";
+import { voiceSection } from "../live/voice";
+import { phoneSection } from "./phone";
+import { guardPrefs, parseList, setGuardPrefs } from "../live/coach";
+import { spotifySettingsRow } from "../live/spotify";
 
 let settings: Settings = { ...DEFAULT_SETTINGS };
 let version = "";
@@ -43,14 +48,14 @@ function renderDiff(text: string): HTMLElement {
   return box;
 }
 
-// ── ai_assistant Code section ───────────────────────────────────────────────────────
+// ── Claude Code section ───────────────────────────────────────────────────────
 
-function ai_assistantSection(status: HookStatus): HTMLElement {
+function claudeSection(status: HookStatus): HTMLElement {
   const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
   const section = h(
     "section",
     {},
-    h("h2", {}, statusDot(status.installed), h("span", { text: "ai_assistant Code" })),
+    h("h2", {}, statusDot(status.installed), h("span", { text: "Claude Code" })),
     body,
   );
 
@@ -61,7 +66,7 @@ function ai_assistantSection(status: HookStatus): HTMLElement {
     draw();
     const head = section.querySelector("h2")!;
     clear(head);
-    head.append(statusDot(status.installed), h("span", { text: "ai_assistant Code" }));
+    head.append(statusDot(status.installed), h("span", { text: "Claude Code" }));
   };
 
   function draw() {
@@ -69,8 +74,8 @@ function ai_assistantSection(status: HookStatus): HTMLElement {
       h("div", {
         class: "hint",
         text: status.installed
-          ? "Winsle is hooked into your ai_assistant Code sessions. Tool calls, questions and permission requests show up in the island, and you can answer them there."
-          : "Install the hooks to see your ai_assistant Code sessions in the island and approve permissions without leaving what you are doing.",
+          ? "Winsle is hooked into your Claude Code sessions. Tool calls, questions and permission requests show up in the island, and you can answer them there."
+          : "Install the hooks to see your Claude Code sessions in the island and approve permissions without leaving what you are doing.",
       }),
       h("div", { class: "row" },
         h("label", { text: "settings.json" }),
@@ -97,7 +102,7 @@ function ai_assistantSection(status: HookStatus): HTMLElement {
       onclick: () => showPreview(true),
     });
     // Writing hook commands that point at a relay which isn't there would give
-    // every ai_assistant Code session a broken hook and nothing to show for it.
+    // every Claude Code session a broken hook and nothing to show for it.
     if (!status.hookReady) {
       install.disabled = true;
       install.title = "The relay isn't installed yet.";
@@ -155,7 +160,7 @@ function ai_assistantSection(status: HookStatus): HTMLElement {
         clear(body);
         body.append(h("div", {
           class: "notice ok",
-          text: `Done. Previous settings saved as ${backup}. Open a new ai_assistant Code session to pick the hooks up.`,
+          text: `Done. Previous settings saved as ${backup}. Open a new Claude Code session to pick the hooks up.`,
         }));
         window.setTimeout(() => void rebuild(), 2600);
       } catch (err) {
@@ -173,12 +178,12 @@ function ai_assistantSection(status: HookStatus): HTMLElement {
   return section;
 }
 
-// ── ai_assistant API section ────────────────────────────────────────────────────────
+// ── Claude API section ────────────────────────────────────────────────────────
 
 const MODELS: [string, string][] = [
-  ["ai_assistant-opus-5", "ai_assistant Opus 5"],
-  ["ai_assistant-sonnet-5", "ai_assistant Sonnet 5"],
-  ["ai_assistant-haiku-4-5", "ai_assistant Haiku 4.5"],
+  ["claude-opus-5", "Claude Opus 5"],
+  ["claude-sonnet-5", "Claude Sonnet 5"],
+  ["claude-haiku-4-5", "Claude Haiku 4.5"],
 ];
 
 function apiSection(hasKey: boolean): HTMLElement {
@@ -248,7 +253,7 @@ function apiSection(hasKey: boolean): HTMLElement {
   return h(
     "section",
     {},
-    h("h2", {}, dot, h("span", { text: "ai_assistant" })),
+    h("h2", {}, dot, h("span", { text: "Claude" })),
     state,
     h("div", { class: "row" }, h("label", { text: "API key" }), field, saveBtn, clearBtn),
     h("div", { class: "row" }, h("label", { text: "Model" }), model),
@@ -450,7 +455,7 @@ function liveSection(hasCalendar: boolean): HTMLElement {
   const calDot = statusDot(hasCalendar);
   const calField = h("input", {
     type: "password",
-    placeholder: hasCalendar ? "••••••••••••  (stored)" : "https://calendar.example.com/sample-link",
+    placeholder: hasCalendar ? "••••••••••••  (stored)" : "https://calendar.google.com/calendar/ical/…/basic.ics",
     style: "flex:1 1 auto;min-width:0",
     autocomplete: "off",
     spellcheck: "false",
@@ -521,6 +526,9 @@ function liveSection(hasCalendar: boolean): HTMLElement {
     h("div", { class: "row" }, h("label", {}, calDot, h("span", { text: " Calendar" })), calField, calSave, calClear),
     h("div", { class: "hint", text: "Google Calendar → Settings → your calendar → \"Secret address in iCal format\". Outlook: Publish calendar → ICS. Stored in the Credential Manager. Reminders fire 30, 15 and 5 minutes before every event." }),
     calFeedback,
+    calendarAccountRows(() => void Bridge.calendarRefresh()),
+    h("div", { class: "hint", text: "Or sign in to read today's meetings with their join links, answer invites from the island and add events from the command palette (\"event tomorrow 3pm Call with Sam\"). Tokens stay in the Credential Manager." }),
+    spotifySettingsRow(),
     h("div", { class: "row" }, h("label", { text: "Render folders" }), dirs),
     h("div", { class: "hint", text: "Premiere, After Effects, Resolve… output folders. Winsle shows a growing file as a render and tells you when it stops." }),
     h("div", { class: "row" }, h("label", { text: "Capture inbox" }), captureDir),
@@ -580,6 +588,36 @@ function habitsSection(): HTMLElement {
   );
 }
 
+// ── Focus ─────────────────────────────────────────────────────────────────────
+
+function focusSection(): HTMLElement {
+  const g = guardPrefs();
+  const area = (value: string[], placeholder: string, apply: (v: string[]) => void) => {
+    const el = h("textarea", { rows: "2", placeholder, style: "width:100%" }) as HTMLTextAreaElement;
+    el.value = value.join(", ");
+    el.addEventListener("change", () => {
+      const list = parseList(el.value);
+      apply(list);
+      el.value = list.join(", ");
+    });
+    return el;
+  };
+  const recap = h("input", { type: "time", value: g.recap }) as HTMLInputElement;
+  recap.addEventListener("change", () => setGuardPrefs({ recap: recap.value }));
+  return h(
+    "section",
+    {},
+    h("h2", {}, h("span", { text: "Focus" })),
+    h("div", { class: "row" }, h("label", { text: "Block apps" })),
+    area(g.apps, "Discord, steam.exe", (apps) => setGuardPrefs({ apps })),
+    h("div", { class: "row" }, h("label", { text: "Block sites" })),
+    area(g.sites, "YouTube, Instagram", (sites) => setGuardPrefs({ sites })),
+    h("div", { class: "hint", text: "While a focus timer runs (Ctrl+Alt+F), a matching app or browser tab is minimised and you can allow it for 5 min. Sites match the browser window title. Nothing is closed and no admin rights are used. Time on these is counted for the weekly report." }),
+    h("div", { class: "row" }, h("label", { text: "Daily recap at" }), recap),
+    h("div", { class: "hint", text: "Clear the time to turn the recap off. The weekly report lives under Screen time." }),
+  );
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -605,12 +643,15 @@ async function main() {
   clear(root);
   root.append(
     h("h1", {}, h("span", { text: "Winsle" }), h("span", { class: "version", text: version })),
-    ai_assistantSection(status),
+    claudeSection(status),
     apiSection(hasKey),
     integrationsSection(present),
     homeSection(),
     liveSection(hasCalendar),
     habitsSection(),
+    h("section", {}, h("h2", {}, h("span", { text: "Voice" })), voiceSection()),
+    phoneSection(),
+    focusSection(),
     generalSection(),
     h("div", {
       class: "hint",

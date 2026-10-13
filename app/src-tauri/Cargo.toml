@@ -19,11 +19,15 @@ windows-core-62 = { package = "windows-core", version = "0.62" }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 tokio = { version = "1", features = ["net", "io-util", "sync", "time", "rt"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 base64 = "0.22"
+sha2 = "0.10"
+getrandom = "0.3"
+qrcodegen = "1.8"
 keyring = { version = "3", features = ["windows-native"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 windows = { version = "0.61", features = [
@@ -48,6 +52,7 @@ windows = { version = "0.61", features = [
   "Win32_System_Memory",
   "Win32_Networking_NetworkListManager",
   "Win32_Media_Audio",
+  "Win32_Security_Cryptography",
   "Win32_Media_Audio_Endpoints",
   "Win32_System_Com_StructuredStorage",
   "Win32_System_Variant",

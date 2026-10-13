@@ -18,12 +18,12 @@ Only requests you set up yourself:
 
 - The calendar feed you link.
 - The integrations you enable (Resend, n8n, Vercel, GitHub), with your own keys.
-- The chat, when you use it, sends your question to the ai_assistant API with your key.
+- The chat, when you use it, sends your question to the Claude API with your key.
 
 ## Clipboard
 
 Only text is read, never images or files. Text that looks like a key, token or hash (`sk-…`, `ghp_…`, JWTs, long random strings) is ignored. History can be turned off entirely.
 
-## ai_assistant Code settings
+## Claude Code settings
 
-Winsle only writes `~/.ai_assistant/settings.json` after you review the diff, and refuses if the file changed in between. A backup is made first.
+Winsle only writes `~/.claude/settings.json` after you review the diff, and refuses if the file changed in between. A backup is made first.

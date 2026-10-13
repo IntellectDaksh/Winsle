@@ -1,6 +1,6 @@
 // Winsle for Windows — app wiring and the commands the island calls.
 
-mod ai_assistant;
+mod claude;
 mod files;
 mod hooks;
 mod integrations;
@@ -11,6 +11,7 @@ mod secrets;
 mod settings;
 mod live;
 mod tray;
+mod updater;
 mod win_user;
 
 use std::os::windows::process::CommandExt;
@@ -22,7 +23,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_autostart::{ManagerExt, MacosLauncher};
 
-use ai_assistant::{Chat, ChatContext, ChatReply};
+use claude::{Chat, ChatContext, ChatReply};
 use files::DroppedFile;
 use hooks::{HookPreview, HookStatus};
 use island::{PollGate, ScreenInfo};
@@ -49,7 +50,7 @@ pub struct BootInfo {
 #[tauri::command]
 fn boot(app: AppHandle, shared: State<Shared>) -> BootInfo {
     let mut settings = shared.settings.lock().unwrap().clone();
-    // The real state of ~/.ai_assistant/settings.json wins over whatever we stored.
+    // The real state of ~/.claude/settings.json wins over whatever we stored.
     settings.hooks_installed = hooks::status().installed;
     let screen = island::screen_info(&app, &settings.screen);
     BootInfo {
@@ -157,7 +158,7 @@ fn open_url(url: String) {
 #[tauri::command]
 fn open_in_vscode(path: Option<String>) -> bool {
     // No `cmd /C` anywhere near this. The path is a project folder chosen by
-    // whoever is using ai_assistant Code, and cmd would happily read `&`, `^` and `%`
+    // whoever is using Claude Code, and cmd would happily read `&`, `^` and `%`
     // in a folder name as syntax. Finding the launcher ourselves and handing the
     // path over as a separate argument keeps it a path.
     if let Some(code) = find_on_path("code") {
@@ -205,7 +206,7 @@ fn set_paused(paused: bool) {
     live::set_paused(paused);
 }
 
-// ── ai_assistant Code hooks ─────────────────────────────────────────────────────────
+// ── Claude Code hooks ─────────────────────────────────────────────────────────
 
 #[tauri::command]
 fn hooks_status() -> HookStatus {
@@ -246,14 +247,14 @@ fn approval_decision(app: AppHandle, request_id: String, decision: String) {
 
 /// The island has the card on screen, so the long wait for a human may begin.
 /// Until this arrives the relay only waits a few hundred milliseconds, which is
-/// what stops a paused or unresponsive island from freezing ai_assistant Code.
+/// what stops a paused or unresponsive island from freezing Claude Code.
 #[tauri::command]
 fn approval_ack(app: AppHandle, request_id: String) {
     pipe::acknowledge(&app, &request_id);
 }
 
 /// Nobody can act on this request — the island is paused, or another card is
-/// already up. ai_assistant Code falls back to asking in the terminal immediately.
+/// already up. Claude Code falls back to asking in the terminal immediately.
 #[tauri::command]
 fn approval_decline(app: AppHandle, request_id: String) {
     pipe::decline(&app, &request_id);
@@ -270,7 +271,7 @@ async fn chat_send(
     context: Option<ChatContext>,
 ) -> Result<ChatReply, String> {
     let model = shared.settings.lock().unwrap().model.clone();
-    ai_assistant::send(&chat, &model, query, context).await
+    claude::send(&chat, &model, query, context).await
 }
 
 #[tauri::command]
@@ -398,6 +399,7 @@ pub fn run() {
             let _ = app.emit_to(island::WINDOW_LABEL, "tray", "open".to_string());
         }))
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Shared {
             settings: Mutex::new(loaded.clone()),
             gate: gate.clone(),
@@ -405,6 +407,10 @@ pub fn run() {
         .manage(Pending::default())
         .manage(Chat::default())
         .invoke_handler(tauri::generate_handler![
+            live::focus_guard::focus_guard_set,
+            live::focus_guard::focus_guard_allow,
+            live::focus_guard::distract_days,
+            live::focus_guard::distract_top,
             boot,
             save_settings,
             set_collapsed,
@@ -435,6 +441,9 @@ pub fn run() {
             live::media::media_control,
             live::capture::capture_save,
             live::capture::capture_hotkey,
+            live::voice::voice_status,
+            live::voice::voice_configure,
+            live::voice::voice_install,
             live::extras::volume_step,
             live::lyrics::lyrics_get,
             live::ai::ai_status,
@@ -455,7 +464,16 @@ pub fn run() {
             live::capture::capture_toggle,
             live::capture::capture_open,
             live::calendar::calendar_refresh,
+            live::calendar_oauth::calendar_accounts,
+            live::calendar_oauth::calendar_connect,
+            live::calendar_oauth::calendar_disconnect,
+            live::calendar_oauth::calendar_rsvp,
+            live::calendar_oauth::calendar_quick_create,
             live::notifs::notif_open,
+            live::phone::phone_status,
+            live::phone::phone_set_enabled,
+            live::phone::phone_revoke,
+            live::phone::phone_new_code,
             set_locked,
             live::tools::pick_color,
             live::tools::apps_list,
@@ -464,6 +482,15 @@ pub fn run() {
             live::dev::transcript_stats,
             live::usage::usage_today,
             live::usage::usage_days,
+            live::usage::usage_top,
+            live::spotify::spotify_status,
+            live::spotify::spotify_connect,
+            live::spotify::spotify_disconnect,
+            live::spotify::spotify_current,
+            live::spotify::spotify_like,
+            live::spotify::spotify_search_play,
+            live::spotify::spotify_playlists,
+            live::spotify::spotify_play_playlist,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -488,6 +515,13 @@ pub fn run() {
 
             log::line(format!("--- Winsle {} started ---", env!("CARGO_PKG_VERSION")));
             hooks::ensure_hook_exe(&handle);
+            // First launch after install: open Settings so the user can connect accounts.
+            let marker = settings::config_dir().join(".welcomed");
+            if !marker.exists() {
+                show_settings_window(&handle);
+                let _ = std::fs::create_dir_all(settings::config_dir());
+                let _ = std::fs::write(&marker, env!("CARGO_PKG_VERSION"));
+            }
             pipe::start(handle.clone());
             integrations::start(handle.clone());
             live::start(handle.clone());

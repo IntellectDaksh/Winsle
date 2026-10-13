@@ -14,6 +14,7 @@ import type { AppEntry, DayUsage } from "./types";
 import { empty, roundBtn, shell } from "./views";
 import { evaluate, convert } from "./calc";
 import { Agent } from "./agent";
+import { coachPanel } from "./coach";
 import { answerBubble } from "./views3";
 
 const STATUS: Record<string, { text: string; cls: string }> = {
@@ -44,7 +45,7 @@ function buildDev(): ViewHost {
   const status = h("span", { class: "dv-status" });
   const clock = h("span", { class: "dv-clock" });
   const histBtn = h("button", { class: "lv-link", text: "History" });
-  const copyBtn = roundBtn(ICONS.copy, "Copy ai_assistant's last reply", async () => {
+  const copyBtn = roundBtn(ICONS.copy, "Copy Claude's last reply", async () => {
     const ok = await Dev.copyReply();
     copyBtn.classList.toggle("ok", ok);
     window.setTimeout(() => copyBtn.classList.remove("ok"), 1200);
@@ -69,7 +70,7 @@ function buildDev(): ViewHost {
     prompt, now,
     h("div", { class: "dv-chips" }, steps.el, files.el, cmds.el, fails.el, agents.el, ctx, model.el),
     list, reply);
-  const none = empty("No coding session yet.", "Start ai_assistant Code (terminal or VS Code) or Antigravity — every step shows up here with timing, files and context use.");
+  const none = empty("No coding session yet.", "Start Claude Code (terminal or VS Code) or Antigravity — every step shows up here with timing, files and context use.");
   const { el } = shell(
     h("div", { class: "dv-head" }, name, status, clock, h("span", { class: "grow" }), histBtn, copyBtn, codeBtn),
     live, none);
@@ -138,7 +139,7 @@ function buildDev(): ViewHost {
         ctxFill.style.background = pct >= 80 ? "var(--red)" : pct >= 60 ? "var(--amber)" : "var(--green-2)";
         ctxText.textContent = `${fmtTokens(s.stats.contextTokens)} / ${fmtTokens(contextWindow(s.stats.model, s.stats.contextTokens))}`;
       }
-      model.set(s.stats?.model ? s.stats.model.replace(/^ai_assistant-/, "") : null);
+      model.set(s.stats?.model ? s.stats.model.replace(/^claude-/, "") : null);
       reply.style.display = s.stats?.lastText && (s.status === "done" || s.status === "error") ? "" : "none";
       reply.textContent = s.stats?.lastText ?? "";
 
@@ -428,7 +429,8 @@ function buildUsage(): ViewHost {
   const sub = h("span", { class: "lv-meta" });
   const week = h("div", { class: "us-week" });
   const list = h("div", { class: "lv-list scroll us-list" });
-  const { el } = shell(h("div", { class: "us-head" }, h("div", { class: "lv-col" }, total, sub), week), list);
+  const coach = coachPanel();
+  const { el } = shell(h("div", { class: "us-head" }, h("div", { class: "lv-col" }, total, sub), week), list, coach.el);
   el.classList.add("us");
   let days: DayUsage[] = [];
   let daysAt = 0;
@@ -437,6 +439,7 @@ function buildUsage(): ViewHost {
     el,
     sync() {
       void Live.loadUsage();
+      coach.sync();
       if (performance.now() - daysAt > 120_000 || !daysAt) {
         daysAt = performance.now();
         void Bridge.usageDays(7).then((d) => { days = d ?? []; key = ""; State.notify(); });

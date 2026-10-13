@@ -13,6 +13,8 @@ import type { ProcInfo } from "./types";
 import { buildMoreViews } from "./views2";
 import { buildAgentViews } from "./views3";
 import { Agent } from "./agent";
+import { Spotify, HEART, HEART_OUTLINE, type SpotifyTrack } from "./spotify";
+import { calendarRsvp } from "./calendar-actions";
 
 export function shell(...children: Node[]): { el: HTMLElement; body: HTMLElement } {
   const body = h("div", { class: "lv-body" }, ...children);
@@ -74,7 +76,22 @@ function buildMedia(): ViewHost {
     volTimer = window.setTimeout(() => void Live.setVolume(Number(vol.value) / 100), 40);
   });
   const volRow = h("div", { class: "lv-vol" }, muteBtn, vol);
-  controls.append(volRow);
+  // Only when Spotify is the player and the account is linked (Settings → Live).
+  let liked: SpotifyTrack | null = null;
+  let likedFor = "";
+  const heart = roundBtn(HEART_OUTLINE, "Save to Liked Songs", () => {
+    if (!liked) return;
+    const t = liked;
+    void Spotify.setLiked(t, !t.liked).then(drawHeart, (err) =>
+      Live.setFlash({ icon: "vol", color: "#1DB954", title: "Spotify", sub: String(err.message ?? err), view: "media" }, 4000));
+  });
+  function drawHeart() {
+    heart.style.display = liked ? "" : "none";
+    heart.title = liked?.liked ? "Remove from Liked Songs" : "Save to Liked Songs";
+    heart.replaceChildren(svg(liked?.liked ? HEART : HEART_OUTLINE, 13, { fill: liked?.liked ? "#1DB954" : undefined }));
+  }
+  drawHeart();
+  controls.append(heart, volRow);
   const player = h("div", { class: "lv-media" }, art,
     h("div", { class: "lv-col" }, title, sub, bar, times, controls));
   const none = empty("Nothing playing.", "Play something in Spotify, YouTube, VLC… and it shows up here.");
@@ -91,6 +108,15 @@ function buildMedia(): ViewHost {
       body.classList.toggle("centered", !m);
       if (!m) return;
       title.textContent = m.title || "Unknown title";
+      const key = `${m.app}${m.title}${m.artist}`;
+      if (key !== likedFor) {
+        likedFor = key;
+        liked = null;
+        drawHeart();
+        void Spotify.track(m).then((t) => {
+          if (likedFor === key) { liked = t; drawHeart(); }
+        });
+      }
       sub.textContent = [m.artist, m.app].filter(Boolean).join(" · ");
       if (m.art !== artSrc) {
         artSrc = m.art;
@@ -349,7 +375,7 @@ function buildCalendar(actions: ViewActions): ViewHost {
         : current ? `In “${current.title || "Busy"}” until ${fmtTime(current.end)}`
         : next ? `Free until ${fmtTime(next.start)}` : "";
       summary.style.display = summary.textContent ? "" : "none";
-      const k = `${c.error}|${events.map((e) => `${e.start}${e.title}${e.joinUrl}`).join("|")}`;
+      const k = `${c.error}|${events.map((e) => `${e.start}${e.title}${e.joinUrl}${e.rsvp}`).join("|")}`;
       if (k !== key) {
         key = k;
         clear(list);
@@ -381,6 +407,13 @@ function buildCalendar(actions: ViewActions): ViewHost {
                 roundBtn(ICONS.clipboard, "Copy meeting link", () => void Live.copyClip(e.joinUrl!)),
                 btn("Join", "primary", () => actions.openUrl(e.joinUrl!))) : null,
             ));
+            if (e.rsvp === "pending") {
+              const answer = (accept: boolean) => void calendarRsvp(e.id, accept).catch((err) =>
+                Live.setFlash({ icon: "cal", color: "#f4505e", title: "RSVP failed", sub: String(err).replace(/^Error:\s*/, ""), view: "calendar" }, 8000));
+              list.append(h("div", { class: "lv-row-acts" },
+                btn("Accept", "primary", () => answer(true)),
+                btn("Decline", "secondary", () => answer(false))));
+            }
           }
         }
       }

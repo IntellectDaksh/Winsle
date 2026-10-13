@@ -12,17 +12,21 @@ use windows::Win32::Foundation::SYSTEMTIME;
 use windows::Win32::System::Time::TzSpecificLocalTimeToSystemTime;
 
 const EVERY: Duration = Duration::from_secs(300);
-const DAY_MS: i64 = 86_400_000;
+pub(super) const DAY_MS: i64 = 86_400_000;
 const WINDOW_MS: i64 = DAY_MS;
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CalendarEvent {
+    /// "ics:<uid>@<start>", "g:<id>" (Google) or "m:<id>" (Outlook); RSVP routes on the prefix.
+    pub id: String,
     pub title: String,
     pub start: i64,
     pub end: i64,
     pub join_url: Option<String>,
     pub location: Option<String>,
+    /// "pending" | "accepted" | "declined" | "tentative" when you're an invitee of an account event.
+    pub rsvp: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -51,21 +55,29 @@ async fn refresh(app: &AppHandle, forced: bool) {
     if crate::live::paused() {
         return;
     }
-    let Some(url) = crate::secrets::get("calendar-ics-url").filter(|u| !u.trim().is_empty()) else {
+    let url = crate::secrets::get("calendar-ics-url").filter(|u| !u.trim().is_empty());
+    if url.is_none() && !super::calendar_oauth::any_connected() {
         if forced || !NO_URL_SENT.swap(true, Ordering::Relaxed) {
             crate::live::emit(app, "live-calendar", CalendarInfo { events: vec![], error: None });
         }
         return;
-    };
+    }
     NO_URL_SENT.store(false, Ordering::Relaxed);
-    let info = match fetch(&url).await {
-        Ok(ics) => CalendarInfo { events: upcoming(&ics, now_ms(), &local_to_utc), error: None },
-        Err(e) => {
-            crate::log::line(format!("calendar: {e}"));
-            CalendarInfo { events: vec![], error: Some(e) }
+    let now = now_ms();
+    let (mut events, mut errors) = super::calendar_oauth::fetch_all(now).await;
+    if let Some(url) = url {
+        match fetch(&url).await {
+            Ok(ics) => super::calendar_oauth::merge(&mut events, upcoming(&ics, now, &local_to_utc)),
+            Err(e) => {
+                crate::log::line(format!("calendar: {e}"));
+                errors.push(e);
+            }
         }
-    };
-    crate::live::emit(app, "live-calendar", info);
+    }
+    events.sort_by_key(|e| (e.start, e.end));
+    // One source failing while another works is logged, not shown over the working list.
+    let error = (events.is_empty() && !errors.is_empty()).then(|| errors.join(" · "));
+    crate::live::emit(app, "live-calendar", CalendarInfo { events, error });
 }
 
 async fn fetch(url: &str) -> Result<String, String> {
@@ -87,7 +99,7 @@ async fn fetch(url: &str) -> Result<String, String> {
     resp.text().await.map_err(|_| "calendar download failed".to_string())
 }
 
-fn now_ms() -> i64 {
+pub(super) fn now_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
@@ -95,7 +107,7 @@ fn now_ms() -> i64 {
 }
 
 /// Naive local wall time (as if UTC) → real UTC ms, using the machine's time zone.
-fn local_to_utc(naive_ms: i64) -> i64 {
+pub(super) fn local_to_utc(naive_ms: i64) -> i64 {
     let (y, m, d) = civil_from_days(naive_ms.div_euclid(DAY_MS));
     let rem = naive_ms.rem_euclid(DAY_MS) / 1000;
     let local = SYSTEMTIME {
@@ -119,7 +131,7 @@ fn local_to_utc(naive_ms: i64) -> i64 {
 
 // ---- civil date math (Howard Hinnant's algorithms) ----
 
-fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+pub(super) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;
@@ -128,7 +140,7 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
-fn civil_from_days(z: i64) -> (i64, i64, i64) {
+pub(super) fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let z = z + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z - era * 146_097;
@@ -473,11 +485,13 @@ fn upcoming(ics: &str, now: i64, tz: &dyn Fn(i64) -> i64) -> Vec<CalendarEvent> 
             let end = s + length;
             if end > now && s < horizon {
                 out.push(CalendarEvent {
+                    id: format!("ics:{}@{s}", ev.uid),
                     title: if ev.summary.trim().is_empty() { "Busy".into() } else { ev.summary.clone() },
                     start: s,
                     end,
                     join_url: join_url.clone(),
                     location: ev.location.clone(),
+                    rsvp: None,
                 });
             }
         }
@@ -486,7 +500,7 @@ fn upcoming(ics: &str, now: i64, tz: &dyn Fn(i64) -> i64) -> Vec<CalendarEvent> 
     out
 }
 
-fn join_url(fields: &[&str]) -> Option<String> {
+pub(super) fn join_url(fields: &[&str]) -> Option<String> {
     for field in fields {
         for token in field.split(|c: char| c.is_whitespace() || "<>\"'()[]|,".contains(c)) {
             let token = token.trim_end_matches(['.', ';', ':']);

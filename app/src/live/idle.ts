@@ -1,5 +1,5 @@
 // The idle capsule: nothing live is taking over the island, so it shows a short
-// rotating gist of what is going on — what ai_assistant Code just did, the latest
+// rotating gist of what is going on — what Claude Code just did, the latest
 // notification, the next event, the clock — and after a few quiet seconds fades
 // the whole island down to ~78 % opacity.
 
@@ -34,17 +34,17 @@ function clock(): GistItem {
 function gist(): GistItem[] {
   const items: GistItem[] = [];
 
-  const ai_assistant = State.tasks.find((t) => t.id === "integration_ai_assistant");
-  if (ai_assistant && (ai_assistant.state !== "idle" || ai_assistant.steps.length)) {
-    const step = ai_assistant.steps.at(-1);
+  const claude = State.tasks.find((t) => t.id === "integration_claude");
+  if (claude && (claude.state !== "idle" || claude.steps.length)) {
+    const step = claude.steps.at(-1);
     const status =
-      ai_assistant.state === "finished" ? "done" :
-      ai_assistant.state === "approval" ? "needs you" :
-      ai_assistant.state === "error" ? "stopped" :
-      ai_assistant.state === "idle" ? "last" : "working";
-    const since = Live.ai_assistantSince;
-    const mins = since != null && ai_assistant.state !== "idle" ? Math.floor((performance.now() - since) / 60_000) : 0;
-    items.push({ key: "ai_assistant", label: `ai_assistant · ${status}${mins > 0 ? ` ${mins}m` : ""}`, color: "#A78BFA", text: step ?? "" });
+      claude.state === "finished" ? "done" :
+      claude.state === "approval" ? "needs you" :
+      claude.state === "error" ? "stopped" :
+      claude.state === "idle" ? "last" : "working";
+    const since = Live.claudeSince;
+    const mins = since != null && claude.state !== "idle" ? Math.floor((performance.now() - since) / 60_000) : 0;
+    items.push({ key: "claude", label: `Claude · ${status}${mins > 0 ? ` ${mins}m` : ""}`, color: "#A78BFA", text: step ?? "" });
   }
 
   const n = Live.notifs.find((x) => !x.noise);
@@ -86,7 +86,7 @@ function suggestions(): GistItem[] {
   const s = Dev.session;
   const pct = Dev.contextPct();
   if (s && pct != null && pct >= 70 && s.status !== "idle") {
-    out.push({ key: "ctx", label: `Context ${Math.round(pct)}%`, color: "#F5A524", text: "/compact soon keeps ai_assistant sharp" });
+    out.push({ key: "ctx", label: `Context ${Math.round(pct)}%`, color: "#F5A524", text: "/compact soon keeps Claude sharp" });
   }
   const open = Live.tasks.filter((t) => !t.done);
   if (open.length) out.push({ key: "task", label: `${open.length} open task${open.length > 1 ? "s" : ""}`, color: "#A78BFA", text: open[open.length - 1].text });
@@ -130,7 +130,7 @@ export class IdleLine {
     }
     const item = items[this.index % items.length];
     if (item.key === this.shownKey) {
-      // Same item, fresher content (a new ai_assistant step, the clock ticking).
+      // Same item, fresher content (a new Claude step, the clock ticking).
       this.fill(item);
       return;
     }

@@ -23,7 +23,7 @@
 ## 0.3.0
 
 ### Added
-- Coding cockpit: live step timeline with timings, files changed, commands, failures, sub-agents, context window use, model, ai_assistant's last reply, turn history.
+- Coding cockpit: live step timeline with timings, files changed, commands, failures, sub-agents, context window use, model, Claude's last reply, turn history.
 - Command palette (`Ctrl+Alt+K`): apps, projects, calculator, unit conversion, timers, notes, web search, clipboard search, system actions.
 - Screen time: active foreground time per app, 7-day chart, per-app daily limits.
 - Today: one-glance recap of focus, screen time, coding, tasks, calendar, downloads, clipboard and notifications.
@@ -64,4 +64,4 @@
 ## 0.1.1
 
 - Live activities: media, timer, calendar, downloads and renders, notifications, system, mic / camera, quick capture.
-- ai_assistant Code and Antigravity sessions, approvals and questions.
+- Claude Code and Antigravity sessions, approvals and questions.

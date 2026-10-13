@@ -218,7 +218,7 @@ fn open_clipboard() -> bool {
     false
 }
 
-fn read_clipboard() -> Option<String> {
+pub(crate) fn read_clipboard() -> Option<String> {
     if !open_clipboard() {
         return None;
     }

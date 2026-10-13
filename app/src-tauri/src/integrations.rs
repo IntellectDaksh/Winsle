@@ -93,7 +93,7 @@ where
             ticker.tick().await;
             // The ticker keeps its cadence; we just decline to do the work. An
             // integration the user switched off, or a paused app, must make no
-            // network calls at all — ai_assistant.md allows talking only to services
+            // network calls at all — CLAUDE.md allows talking only to services
             // the user configured, and a disabled one is not configured.
             if PAUSED.load(Ordering::Relaxed) || !enabled(&app, id) {
                 continue;
@@ -145,7 +145,7 @@ fn status_error(code: u16, unauthorised_hint: &str) -> String {
 
 async fn poll_stripe(app: AppHandle) {
     let Some(key) = secrets::get("stripe-api-key") else { return };
-    let auth = format!("Basic {}", crate::ai_assistant::base64_for(format!("{key}:").as_bytes()));
+    let auth = format!("Basic {}", crate::claude::base64_for(format!("{key}:").as_bytes()));
     let http = client();
 
     let balance = http

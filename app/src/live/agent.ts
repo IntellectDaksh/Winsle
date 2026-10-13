@@ -10,6 +10,8 @@ import { State } from "../core/state";
 import { Dev, fmtDuration } from "./dev";
 import { load, prefs, save, today } from "./prefs";
 import { Live, fmtHM, fmtTime, fmtUntil } from "./store";
+import { Spotify } from "./spotify";
+import { quickEvent } from "./calendar-actions";
 
 export interface Reminder {
   id: number;
@@ -292,7 +294,8 @@ class AgentCore {
     State.notify();
     let reply: AgentReply;
     try {
-      reply = this.local(text) ?? (await this.viaAi(text));
+      const sp = await Spotify.command(text);
+      reply = sp != null ? { text: sp, did: ["Spotify"], ai: false } : (await quickEvent(text)) ?? this.local(text) ?? (await this.viaAi(text));
     } catch (err) {
       reply = { text: String(err).replace(/^Error:\s*/, ""), did: [], ai: false };
     }

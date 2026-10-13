@@ -16,7 +16,7 @@ pub struct Settings {
     pub screen: String,
     pub autostart: bool,
     pub hooks_installed: bool,
-    /// ai_assistant model used by the chat. Changeable in the settings window.
+    /// Claude model used by the chat. Changeable in the settings window.
     /// Defaulted explicitly so a settings.json written by an older build still loads.
     #[serde(default = "default_model")]
     pub model: String,
@@ -36,7 +36,7 @@ fn default_home_widgets() -> Vec<String> {
 }
 
 fn default_model() -> String {
-    crate::ai_assistant::DEFAULT_MODEL.to_string()
+    crate::claude::DEFAULT_MODEL.to_string()
 }
 
 impl Default for Settings {

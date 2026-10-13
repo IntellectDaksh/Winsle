@@ -1,4 +1,4 @@
-// ai_assistant API client — the same integration as ai_assistantService.swift: multi-turn
+// Claude API client — the same integration as ClaudeService.swift: multi-turn
 // chat with web search, and files sent as document/image/text blocks.
 //
 // Everything happens here rather than in the island: the API key never leaves
@@ -20,7 +20,7 @@ const MAX_TOKENS: u32 = 4096;
 /// Text and code files are inlined; anything larger is skipped, as on macOS.
 const MAX_INLINE_TEXT: u64 = 200_000;
 
-pub const DEFAULT_MODEL: &str = "ai_assistant-opus-5";
+pub const DEFAULT_MODEL: &str = "claude-opus-5";
 
 const SYSTEM_PROMPT: &str = "You are Mochi, a personal AI assistant living at the top of the user's screen. \
 You have web search access and can help with absolutely anything — research, coding, finding places, recommendations, tasks, questions. \
@@ -82,7 +82,7 @@ pub async fn send(
     let mut content: Vec<Value> = Vec::new();
 
     // File / window context rides along with the first message only, exactly
-    // like ai_assistantService.chat().
+    // like ClaudeService.chat().
     if chat.is_empty() {
         match &context {
             Some(ChatContext::File { name, path }) => {
@@ -129,7 +129,7 @@ pub async fn send(
             .get("stop_details")
             .and_then(|d| d.get("explanation"))
             .and_then(Value::as_str)
-            .unwrap_or("ai_assistant declined this one.");
+            .unwrap_or("Claude declined this one.");
         return Err(why.to_string());
     }
 
@@ -187,13 +187,13 @@ async fn call(key: &str, body: &Value) -> Result<Value, String> {
                     .map(str::to_string)
             })
             .unwrap_or_else(|| text.chars().take(200).collect());
-        return Err(format!("ai_assistant API {status}: {detail}"));
+        return Err(format!("Claude API {status}: {detail}"));
     }
     serde_json::from_str(&text).map_err(|e| format!("Bad API response: {e}"))
 }
 
 /// PDF → document block, image → image block, text/code → inline text.
-/// Mirrors readFileAsBlock() in ai_assistantService.swift.
+/// Mirrors readFileAsBlock() in ClaudeService.swift.
 fn file_block(path: &str) -> Option<Value> {
     let ext = std::path::Path::new(path)
         .extension()

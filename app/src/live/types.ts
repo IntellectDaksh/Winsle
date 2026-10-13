@@ -72,11 +72,14 @@ export interface NotifInfo {
 }
 
 export interface CalendarEvent {
+  id: string; // "ics:…", "g:…" (Google) or "m:…" (Outlook)
   title: string;
   start: number; // epoch ms
   end: number;
   joinUrl: string | null; // Meet / Zoom / Teams link found in the event
   location: string | null;
+  /** Set when you're an invitee of a Google/Outlook event. */
+  rsvp: "pending" | "accepted" | "declined" | "tentative" | null;
 }
 
 /** `live-calendar` — next 24 h, sorted, every 5 min and on calendar_refresh. */
@@ -123,7 +126,7 @@ export interface TaskLine {
   done: boolean;
 }
 
-/** `transcript_stats` — read from the ai_assistant Code transcript (.jsonl). */
+/** `transcript_stats` — read from the Claude Code transcript (.jsonl). */
 export interface TranscriptStats {
   model: string | null;
   contextTokens: number;

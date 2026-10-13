@@ -1,4 +1,4 @@
-// ai_assistant Code session stats from its transcript (.jsonl under ~/.ai_assistant/projects).
+// Claude Code session stats from its transcript (.jsonl under ~/.claude/projects).
 
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
@@ -21,11 +21,11 @@ pub struct TranscriptStats {
 
 fn checked_path(path: &str) -> Result<PathBuf, String> {
     let home = std::env::var_os("USERPROFILE").ok_or("no USERPROFILE")?;
-    let root = PathBuf::from(home).join(".ai_assistant").join("projects").canonicalize().map_err(|e| e.to_string())?;
+    let root = PathBuf::from(home).join(".claude").join("projects").canonicalize().map_err(|e| e.to_string())?;
     let p = PathBuf::from(path).canonicalize().map_err(|e| e.to_string())?;
     let jsonl = p.extension().is_some_and(|e| e.eq_ignore_ascii_case("jsonl"));
     if !jsonl || !p.starts_with(&root) || !p.is_file() {
-        return Err("not a ai_assistant Code transcript".into());
+        return Err("not a Claude Code transcript".into());
     }
     Ok(p)
 }
@@ -92,12 +92,12 @@ mod tests {
     fn parses_sample() {
         let t = r#"tial garbage line
 {"type":"user","message":{"content":"hi"}}
-{"type":"assistant","message":{"model":"ai_assistant-x","content":[{"type":"text","text":" first "}],"usage":{"input_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":5,"output_tokens":7}}}
+{"type":"assistant","message":{"model":"claude-x","content":[{"type":"text","text":" first "}],"usage":{"input_tokens":10,"cache_read_input_tokens":100,"cache_creation_input_tokens":5,"output_tokens":7}}}
 not json
-{"type":"assistant","message":{"model":"ai_assistant-y","content":[{"type":"tool_use","name":"Read"}],"usage":{"input_tokens":1,"cache_read_input_tokens":200,"output_tokens":3}}}
+{"type":"assistant","message":{"model":"claude-y","content":[{"type":"tool_use","name":"Read"}],"usage":{"input_tokens":1,"cache_read_input_tokens":200,"output_tokens":3}}}
 "#;
         let s = stats(t);
-        assert_eq!(s.model.as_deref(), Some("ai_assistant-y"));
+        assert_eq!(s.model.as_deref(), Some("claude-y"));
         assert_eq!(s.context_tokens, 201);
         assert_eq!(s.output_tokens, 10);
         assert_eq!(s.last_text.as_deref(), Some("first"));

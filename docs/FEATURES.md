@@ -2,7 +2,7 @@
 
 ## Coding sessions
 
-- ai_assistant Code and Antigravity sessions appear as tasks with live tool steps.
+- Claude Code and Antigravity sessions appear as tasks with live tool steps.
 - Permission requests and questions open the island; allow or deny from there.
 - Several projects at once show as mini bots, each with its own colour.
 
@@ -11,6 +11,7 @@
 - Now playing from any app that reports to Windows (Spotify, browsers, VLC…), with artwork.
 - Play / pause, previous, next, click the progress bar to seek.
 - Volume slider and mute; scroll on the compact capsule for a volume HUD.
+- Optional Spotify link (Settings → Live → Connect): heart to like/unlike the current track, and "play …", "queue …", "playlists", "playlist …" in the command bar. Playback control needs Premium.
 
 ## Timer and focus
 
@@ -26,6 +27,7 @@
 - Up to eight upcoming events with day separators and a "free until" summary.
 - Reminders 30, 15 and 5 minutes before; the island opens two minutes before.
 - One-click join for Meet / Zoom / Teams links, plus copy link.
+- Sign in with Google Calendar or Outlook (alongside or instead of the feed): accept/decline invites from the calendar view, and "event tomorrow 3pm Call with Sam" in the command palette adds an event.
 
 ## Notifications
 
@@ -64,3 +66,10 @@ Up to three tiles next to the coding card, chosen in Settings: now playing, next
 ## Startup
 
 Winsle registers itself to start with Windows (toggle in Settings → General).
+
+## Focus guard & coach
+
+Settings → Focus: block-listed apps (exe names) and site keywords (matched against browser window titles). While a focus timer runs, a matching foreground window is minimised (never closed, no admin) with "Blocked during focus"; open Screen time to allow it for 5 min. Uses the existing 5 s screen-time sample. A daily recap flashes at the set time (default 21:00); Screen time shows the weekly report: focus minutes, streak, top apps, distracting time vs last week and two rule-based suggestions (reworded by local Ollama only if it is already running).
+
+## Voice commands
+Offline push-to-talk: Settings → Voice → enable (downloads whisper.cpp v1.9.2 + ggml-tiny.en, ~85 MB, SHA-256 pinned, to %LOCALAPPDATA%\Winsleoice). Hold Ctrl+Alt+J (letter configurable), speak up to 15 s, release; the transcript runs through the assistant like palette input. No wake word: the mic and whisper only run while the keys are held.

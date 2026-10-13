@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Winsle phone link</title>
+<style>
+  :root { --bg:#0e0f12; --card:#181a20; --fg:#eceef3; --mute:#9096a3; --acc:#7c9cff; --err:#f4505e; --ok:#34d399; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f4f5f8; --card:#fff; --fg:#14161b; --mute:#5d6370; } }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; max-width:560px; margin-inline:auto; }
+  h1 { font-size:20px; margin:4px 0 16px; }
+  h2 { font-size:15px; margin:0 0 10px; color:var(--mute); font-weight:600; }
+  section { background:var(--card); border-radius:14px; padding:14px; margin-bottom:12px; }
+  input, textarea { width:100%; font:inherit; color:inherit; background:transparent; border:1px solid #3a3f4b; border-radius:10px; padding:10px; }
+  textarea { min-height:90px; resize:vertical; }
+  button { font:inherit; border:0; border-radius:10px; padding:11px 14px; background:var(--acc); color:#fff; min-height:44px; cursor:pointer; }
+  button.ghost { background:transparent; border:1px solid #3a3f4b; color:inherit; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+  .row { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+  .row > button { flex:1; }
+  .msg { min-height:1.4em; font-size:14px; color:var(--mute); margin-top:6px; }
+  .msg.err { color:var(--err); } .msg.ok { color:var(--ok); }
+  code, pre { font:13px/1.4 ui-monospace,Consolas,monospace; }
+  pre { white-space:pre-wrap; word-break:break-all; background:rgba(127,127,127,.12); padding:10px; border-radius:8px; margin:6px 0; }
+  details summary { cursor:pointer; padding:6px 0; }
+  .hidden { display:none; }
+  label { display:block; font-size:14px; color:var(--mute); margin:8px 0 4px; }
+</style>
+</head>
+<body>
+<h1>Winsle phone link</h1>
+
+<section id="pair">
+  <h2>Pair this phone</h2>
+  <label for="code">6-digit code from Winsle → Settings → Phone link</label>
+  <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*">
+  <label for="name">Device name</label>
+  <input id="name" maxlength="40" placeholder="My phone">
+  <div class="row"><button id="pairBtn">Pair</button></div>
+  <div class="msg" id="pairMsg" role="status"></div>
+</section>
+
+<div id="app" class="hidden">
+  <section>
+    <h2>Clipboard</h2>
+    <textarea id="clip" aria-label="Clipboard text" placeholder="Paste or type text"></textarea>
+    <div class="row">
+      <button id="toPc">Send to PC</button>
+      <button id="fromPc" class="ghost">Get from PC</button>
+    </div>
+    <div class="msg" id="clipMsg" role="status"></div>
+  </section>
+
+  <section>
+    <h2>Media</h2>
+    <div class="row">
+      <button class="ghost" data-media="prev" aria-label="Previous">⏮</button>
+      <button data-media="play_pause" aria-label="Play or pause">⏯</button>
+      <button class="ghost" data-media="next" aria-label="Next">⏭</button>
+    </div>
+    <div class="msg" id="mediaMsg" role="status"></div>
+  </section>
+
+  <section>
+    <h2>Forward phone notifications</h2>
+    <p>Send an HTTP POST from an automation app whenever a notification arrives. Only works while the phone is on the same Wi-Fi as the PC.</p>
+    <label>URL</label>
+    <pre id="autoUrl"></pre>
+    <label>Header</label>
+    <pre id="autoHdr"></pre>
+    <div class="row"><button class="ghost" id="copyUrl">Copy URL</button><button class="ghost" id="copyHdr">Copy header</button></div>
+    <label>Body (JSON, Content-Type: application/json)</label>
+    <pre>{"app":"WhatsApp","title":"Sender","body":"Message text"}</pre>
+    <details><summary>Tasker (Android)</summary>
+      <p>Profile → Event → UI → Notification (pick apps). Task → Net → HTTP Request: Method POST, URL above, Headers <code>Authorization: Bearer …</code> and <code>Content-Type: application/json</code>, Body <code>{"app":"%an","title":"%ntitle","body":"%ntext"}</code>. Use Tasker's AutoNotification or the built-in %evtprm variables if %ntitle is empty.</p>
+    </details>
+    <details><summary>MacroDroid (Android)</summary>
+      <p>Trigger: Notification received (choose apps). Action: HTTP Request → POST, URL above, add both headers, Content body <code>{"app":"[notification_app_name]","title":"[notification_title]","body":"[notification]"}</code>.</p>
+    </details>
+    <details><summary>iOS Shortcuts</summary>
+      <p>iOS doesn't let apps read other apps' notifications. Use Automation → "When I get a message / email / app opened", then action "Get contents of URL": Method POST, Headers as above, Request Body JSON with keys app, title, body.</p>
+    </details>
+    <div class="msg" id="autoMsg" role="status"></div>
+  </section>
+
+  <section>
+    <div class="row"><button class="ghost" id="unpair">Forget this phone</button></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const KEY = "winsle-token";
+  let token = "";
+  try { token = localStorage.getItem(KEY) || ""; } catch {}
+
+  function say(el, text, kind) { el.textContent = text; el.className = "msg" + (kind ? " " + kind : ""); }
+
+  async function api(method, path, body) {
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = "Bearer " + token;
+    const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined, cache: "no-store" });
+    if (res.status === 401 && path !== "/pair") { forget(); throw new Error("This phone is no longer paired."); }
+    const data = res.status === 204 ? null : await res.json().catch(() => null);
+    if (!res.ok) throw new Error((data && data.error) || ("HTTP " + res.status));
+    return data;
+  }
+
+  function show() {
+    $("pair").classList.toggle("hidden", !!token);
+    $("app").classList.toggle("hidden", !token);
+    $("autoUrl").textContent = location.origin + "/notify";
+    $("autoHdr").textContent = "Authorization: Bearer " + token;
+  }
+  function forget() { token = ""; try { localStorage.removeItem(KEY); } catch {} show(); }
+
+  $("pairBtn").onclick = async () => {
+    const code = $("code").value.trim();
+    if (!/^\d{6}$/.test(code)) return say($("pairMsg"), "Enter the 6 digits shown in Winsle.", "err");
+    try {
+      const r = await api("POST", "/pair", { code, name: $("name").value.trim() });
+      token = r.token;
+      try { localStorage.setItem(KEY, token); } catch {}
+      show();
+    } catch (e) { say($("pairMsg"), e.message, "err"); }
+  };
+
+  $("toPc").onclick = async () => {
+    try { await api("POST", "/clip", { text: $("clip").value }); say($("clipMsg"), "Copied on PC.", "ok"); }
+    catch (e) { say($("clipMsg"), e.message, "err"); }
+  };
+  $("fromPc").onclick = async () => {
+    try {
+      const r = await api("GET", "/clip");
+      $("clip").value = r.text;
+      try { await navigator.clipboard.writeText(r.text); say($("clipMsg"), "Copied to this phone.", "ok"); }
+      catch { say($("clipMsg"), "Loaded. Long-press the box to copy (plain http blocks auto-copy).", ""); }
+    } catch (e) { say($("clipMsg"), e.message, "err"); }
+  };
+  document.querySelectorAll("[data-media]").forEach((b) => {
+    b.onclick = async () => {
+      try { await api("POST", "/media", { action: b.dataset.media }); say($("mediaMsg"), "", ""); }
+      catch (e) { say($("mediaMsg"), e.message, "err"); }
+    };
+  });
+  async function copy(text) {
+    try { await navigator.clipboard.writeText(text); say($("autoMsg"), "Copied.", "ok"); }
+    catch { say($("autoMsg"), "Select the text above and copy it manually.", ""); }
+  }
+  $("copyUrl").onclick = () => copy($("autoUrl").textContent);
+  $("copyHdr").onclick = () => copy($("autoHdr").textContent);
+  $("unpair").onclick = forget;
+  show();
+})();
+</script>
+</body>
+</html>

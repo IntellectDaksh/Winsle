@@ -52,7 +52,7 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468
 }
 
-fn civil(z: i64) -> String {
+pub(crate) fn civil(z: i64) -> String {
     let z = z + 719468;
     let era = z.div_euclid(146097);
     let doe = z - era * 146097;
@@ -65,7 +65,7 @@ fn civil(z: i64) -> String {
     format!("{y:04}-{m:02}-{d:02}")
 }
 
-fn today_num() -> i64 {
+pub(crate) fn today_num() -> i64 {
     let t = unsafe { GetLocalTime() };
     days_from_civil(t.wYear as i64, t.wMonth as i64, t.wDay as i64)
 }
@@ -160,10 +160,13 @@ pub fn spawn() {
         loop {
             std::thread::sleep(Duration::from_secs(TICK));
             if !crate::live::paused() && crate::live::extras::idle_seconds() <= IDLE_SECS {
-                if let Some(name) = foreground_stem().and_then(|s| friendly(&s)) {
-                    let day = civil(today_num());
-                    let mut g = STATE.lock().unwrap_or_else(|e| e.into_inner());
-                    *g.entry(day).or_default().entry(name).or_default() += TICK;
+                if let Some(stem) = foreground_stem() {
+                    crate::live::focus_guard::check(&stem);
+                    if let Some(name) = friendly(&stem) {
+                        let day = civil(today_num());
+                        let mut g = STATE.lock().unwrap_or_else(|e| e.into_inner());
+                        *g.entry(day).or_default().entry(name).or_default() += TICK;
+                    }
                 }
             }
             if saved.elapsed() >= SAVE_EVERY {
@@ -199,6 +202,21 @@ fn day_totals(days: &Days, today: i64, n: u32) -> Vec<DayUsage> {
 #[tauri::command]
 pub fn usage_days(days: u32) -> Vec<DayUsage> {
     day_totals(&STATE.lock().unwrap_or_else(|e| e.into_inner()), today_num(), days)
+}
+
+/// Per-app seconds summed over the last `days` days, biggest first.
+#[tauri::command]
+pub fn usage_top(days: u32) -> Vec<AppUsage> {
+    let oldest = civil(today_num() - days.clamp(1, KEEP_DAYS as u32) as i64 + 1);
+    let mut sum: BTreeMap<String, u64> = BTreeMap::new();
+    for (_, apps) in STATE.lock().unwrap_or_else(|e| e.into_inner()).range(oldest..) {
+        for (n, s) in apps {
+            *sum.entry(n.clone()).or_default() += s;
+        }
+    }
+    let mut v: Vec<AppUsage> = sum.into_iter().map(|(name, secs)| AppUsage { name, secs }).collect();
+    v.sort_by(|a, b| b.secs.cmp(&a.secs));
+    v
 }
 
 #[cfg(test)]

@@ -9,6 +9,8 @@ import { Island } from "./island/island";
 import { registerHookHandlers } from "./island/hooks";
 import { registerIntegrationHandlers, refreshConfigured } from "./island/integrations";
 import { Live } from "./live/store";
+import { registerVoice } from "./live/voice";
+import { Coach } from "./live/coach";
 
 async function main() {
   const root = document.getElementById("root");
@@ -64,6 +66,7 @@ async function main() {
 
   registerHookHandlers(island);
   registerIntegrationHandlers(island);
+  void registerVoice();
   Live.register(
     (view) => island.alert(view),
     () => island.reveal(),
@@ -80,6 +83,7 @@ async function main() {
   );
 
   island.launch();
+  Coach.start();
 
   // In a plain browser there is no wake strip behind the cursor: make the whole
   // page wake the island so the visuals can be checked with `npm run dev`.

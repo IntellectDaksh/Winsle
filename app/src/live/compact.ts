@@ -185,7 +185,8 @@ function buildSlot(kind: CompactKind): Slot {
         update() {
           const f = Live.flash;
           if (!f) return;
-          const k = `${f.icon}|${f.title}|${f.sub}|${f.level ?? ""}|${f.swatch ?? ""}`;
+          // `until` is unique per setFlash, so an identical repeat flash re-pops too.
+          const k = `${f.until}|${f.icon}|${f.title}|${f.sub}|${f.level ?? ""}|${f.swatch ?? ""}`;
           if (k === key) return;
           key = k;
           const glyph = {

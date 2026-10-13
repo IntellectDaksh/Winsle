@@ -3,7 +3,7 @@
 Winsle is a Tauri 2 app: a Rust backend that talks to Windows, and a single always-on-top WebView2 window that draws the island. A second, hidden window holds the settings page.
 
 ```
- ai_assistant Code ──► winsle-hook.exe ──► named pipe ─┐
+ Claude Code ──► winsle-hook.exe ──► named pipe ─┐
  Antigravity ──► antigravity-bridge.mjs ─────────┤
                                                  ▼
  Windows APIs ──► Rust pollers (src-tauri/src/live) ──► events ──► TypeScript island (src/)
@@ -18,8 +18,8 @@ Winsle is a Tauri 2 app: a Rust backend that talks to Windows, and a single alwa
 | `lib.rs` | App wiring, Tauri commands, settings window, autostart |
 | `island.rs` | Window geometry, click-through, focus handling, WebView2 memory target |
 | `pipe.rs` | Named-pipe server for the hook relay; approval round-trips |
-| `hooks.rs` | Reads and writes `~/.ai_assistant/settings.json`, always behind a reviewed diff |
-| `ai_assistant.rs` | Chat with the ai_assistant API (key stays in Rust) |
+| `hooks.rs` | Reads and writes `~/.claude/settings.json`, always behind a reviewed diff |
+| `claude.rs` | Chat with the Claude API (key stays in Rust) |
 | `integrations.rs` | Resend, n8n, Vercel and GitHub status pollers |
 | `secrets.rs` | Windows Credential Manager wrapper |
 | `settings.rs` | `%APPDATA%\Winsle\settings.json` |

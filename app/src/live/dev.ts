@@ -1,4 +1,4 @@
-// Coding-session tracker: turns raw ai_assistant Code / Antigravity hook events into a
+// Coding-session tracker: turns raw Claude Code / Antigravity hook events into a
 // timeline the island can show — what was asked, every step with its time, files
 // touched, commands run, failures, context used — plus a short history of past
 // turns. Fed from island/hooks.ts; rendered by the dev cockpit and the home card.
@@ -300,7 +300,7 @@ class DevTracker {
     });
   }
 
-  /** Reads model, context size and ai_assistant's last reply from the transcript. */
+  /** Reads model, context size and Claude's last reply from the transcript. */
   async refreshStats() {
     const s = this.session;
     if (!s?.transcript) return;
