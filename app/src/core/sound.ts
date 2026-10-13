@@ -84,6 +84,18 @@ class SoundEngine {
     this.enabled = on;
   }
 
+  hasSound(name: string): boolean {
+    return this.buffers.has(name);
+  }
+
+  isReady(): boolean {
+    return this.buffers.size > 0 && this.ctx != null;
+  }
+
+  loadedCount(): number {
+    return this.buffers.size;
+  }
+
   play(name: SoundName | string) {
     if (!this.enabled) return;
     const ctx = this.ctx;
