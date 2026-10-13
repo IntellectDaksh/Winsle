@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "icons": "node scripts/gen-icons.mjs",
     "test:calc": "node scripts/test-calc.mjs",
+    "test:lyrics": "node scripts/test-lyrics.mjs",
+    "test": "node scripts/test-calc.mjs && node scripts/test-lyrics.mjs",
     "tauri": "tauri",
     "predev": "cargo build --release -p winsle-hook",
     "prebuild": "cargo build --release -p winsle-hook",
