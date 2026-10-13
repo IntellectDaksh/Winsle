@@ -18,6 +18,14 @@ Winsle brings a fluid, interactive dynamic island to Windows. It sits subtly at 
 
 ---
 
+> [!IMPORTANT]
+> ### ⚡ The Main Way to Install: Single-Click Executable
+> 1. **Download the Setup `.exe`:** Grab the latest `Winsle-Windows-setup.exe` from [**Releases**](https://github.com/IntellectDaksh/Winsle/releases).
+> 2. **Automatic Dependencies:** Run the installer. You **do not** need Node.js, Rust, Python, or any developer tools installed. All runtimes and system dependencies (including Microsoft WebView2) are **automatically downloaded and configured** for you.
+> 3. **Set Up or Skip:** On first launch, the Settings window opens with options to link your accounts (Spotify, Google Calendar, Outlook, API keys). You can configure them or **skip it completely** — Winsle works right out of the box with zero keys!
+
+---
+
 ## Where it fits
 
 | Feature | macOS Dynamic Island | Standard Windows Taskbar | Third-Party Widget Bars | Winsle |
@@ -34,29 +42,37 @@ Winsle brings a fluid, interactive dynamic island to Windows. It sits subtly at 
 
 ## System Requirements
 
-### Runtime Requirements
+### Everyday Users (Standard Setup)
 * **Operating System:** Windows 10 or Windows 11 (64-bit, x64).
-* **Hardware:** Any modern dual-core CPU and at least 2 GB of RAM. Winsle is designed to stay tiny and silent in the background.
-* **WebView2 Runtime:** Included with Windows 10/11. The standalone setup installer automatically embeds the bootstrapper if missing.
+* **Hardware:** Any PC with at least 2 GB of RAM and a dual-core CPU.
+* **Dependencies:** **None to install manually.** The setup executable automatically embeds and bootstraps the Microsoft WebView2 runtime and stages all background relay binaries.
 
-### Build & Development Requirements
-If compiling from source:
+### Developers (Building from Source Only)
+Only required if compiling or modifying the source code:
 * **Node.js:** v20.0.0 or higher ([nodejs.org](https://nodejs.org))
-* **Rust:** Stable toolchain (`x86_64-pc-windows-msvc`) installed via [rustup.rs](https://rustup.rs)
-* **Visual Studio C++ Build Tools:** Desktop development with C++ (MSVC compiler and Windows 10/11 SDK)
-* **Git:** For cloning and version management
+* **Rust:** Stable toolchain (`x86_64-pc-windows-msvc`) via [rustup.rs](https://rustup.rs)
+* **Visual Studio C++ Build Tools:** Desktop development with C++ (MSVC compiler & Windows SDK)
+* **Git:** For repository cloning
 
 ---
 
 ## Install & Quick Start
 
-### 1. Pre-built Executable (Recommended)
-1. Download `Winsle_x.y.z_x64-setup.exe` from [Releases](https://github.com/IntellectDaksh/Winsle/releases).
-2. Run the installer. No administrative privileges required.
-3. On first launch, the Settings window opens automatically so you can configure optional modules (Spotify, Calendar, Phone Link, Voice).
-> *Note on Windows SmartScreen:* Unsigned builds may trigger a SmartScreen alert. Click **More info → Run anyway**.
+### 🚀 Primary Option: Pre-built Executable (Recommended)
 
-### 2. Build from Source
+1. **Download:** Get `Winsle-Windows-setup.exe` from [**Releases**](https://github.com/IntellectDaksh/Winsle/releases).
+2. **Run Installer:** Double-click the `.exe` to install. 
+   * No administrator rights required.
+   * If Microsoft WebView2 is missing on your system, the installer will **automatically download and install it silently**.
+   * Background relays (`winsle-hook.exe`), tactile sounds, and system tray hooks are automatically deployed to `%LOCALAPPDATA%\Winsle\bin`.
+3. **First-Launch Setup (Configure or Skip):** 
+   * Winsle will automatically launch and present the **Settings window**.
+   * You can choose to connect your accounts (Spotify, Calendar, Phone Link, API keys).
+   * **Or simply close / skip it!** All integrations are completely optional. Winsle immediately functions as a dynamic island, clipboard manager, and system HUD with zero keys set up.
+4. **SmartScreen Notice:** On unsigned releases, Windows SmartScreen may show a prompt. Click **More info → Run anyway**.
+
+### 🛠️ Developer Option: Build from Source
+If you wish to compile Winsle yourself:
 ```bash
 # 1. Clone the repository
 git clone https://github.com/IntellectDaksh/Winsle.git
@@ -65,7 +81,7 @@ cd Winsle/app
 # 2. Install frontend dependencies
 npm install
 
-# 3. Run in live development mode
+# 3. Run in live development mode (auto-reloads)
 npm run tauri dev
 
 # 4. Compile a standalone release package
