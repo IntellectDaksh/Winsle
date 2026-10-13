@@ -1,137 +1,257 @@
-# Winsle
+<div align="center">
+  <img src="app/src-tauri/icons/128x128.png" width="96" height="96" alt="Winsle logo" />
 
-A dynamic island for Windows.
+  # Winsle
 
-Mochi lives at the top of your screen. It follows your Claude Code and Antigravity sessions, and surfaces what is happening on the PC: media, timers and focus sessions, calendar, downloads and renders, notifications, clipboard history, system load, mic and camera use, and quick capture.
+  **A dynamic island for Windows. Mochi lives at the top of your screen.**
 
-Local-first. No telemetry, no Winsle account. The network is only used for services you connect yourself, the optional Spotify lyrics lookup (lrclib.net) and the signed update check. Tokens and keys live in the Windows Credential Manager, never in the code.
+  ![CI](https://github.com/IntellectDaksh/Winsle/actions/workflows/ci.yml/badge.svg)
+  ![Release](https://img.shields.io/github/v/release/IntellectDaksh/Winsle)
+  ![License](https://img.shields.io/badge/license-MIT-blue)
+  ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-informational)
+  ![Built with](https://img.shields.io/badge/built%20with-Tauri%202%20%2B%20Rust-orange)
+</div>
 
-Runs on any 64-bit Windows 10/11 PC, including 2 GB RAM laptops: everything optional is off until you turn it on.
+Winsle brings a fluid, interactive dynamic island to Windows. It sits subtly at the top of your desktop, follows your active **Claude Code** and **Antigravity** coding sessions, and surfaces live system activities: Spotify playback, calendar agendas, phone notifications, download/render progress, clipboard history, focus sessions, screen-time stats, and push-to-talk voice dictation.
+
+**Local-first by design.** No cloud server, no telemetry, and no Winsle account. The network is only touched for services you explicitly link, the optional keyless Spotify lyrics lookup (`lrclib.net`), and signed updater checks. Tokens and keys reside strictly in the **Windows Credential Manager** or your local `.env`, never in code.
 
 ---
 
-## Highlights
+## Where it fits
 
-| Area | What it does |
-|---|---|
-| **Coding sessions** | Cockpit with step timeline, files, context use and last reply; approvals answered from the island |
-| **Assistant** | Local mini agent: reminders, timers, tasks, media, calendar answers, automations, clipboard AI actions, notification digest (Ollama, on-device) |
-| **Command palette** | Apps, projects, maths, conversions, timers, notes, web and system actions |
-| **Screen time** | Per-app active time, weekly chart, daily limits, and a Today recap |
-| **Media** | Now playing from any app, seek, volume and mute |
-| **Focus** | Pomodoro with long breaks, daily stats and streak, break reminders after long stretches at the screen |
-| **Calendar** | Next events from any iCal link, reminders at 30 / 15 / 5 min, one-click join |
-| **Notifications** | Windows toasts in one list; Do not disturb, per-app mute, quiet during meetings |
-| **Files** | Download and render progress, finished-file history with open and show-in-folder |
-| **Clipboard** | History of copied text, pin and re-copy; secrets are never recorded |
-| **Capture** | Global hotkey to a Markdown inbox, tasks ticked off from the island |
-| **System** | CPU, RAM, GPU, disk, network, uptime, battery and the heaviest apps |
-| **Spotify** | Sign in with your Spotify account: like tracks, `play …` / `queue …`, start playlists |
-| **Google Calendar & Outlook** | Sign in instead of pasting a link: join, accept or decline, `event tomorrow 3pm …` |
-| **Phone link** | Pair a phone over home Wi-Fi with a QR code: clipboard both ways, media remote, phone notifications on the PC |
-| **Focus guard & coach** | Minimises blocked apps and sites during focus, nightly recap, weekly report |
-| **Voice** | Hold `Ctrl+Alt+J` and speak; fully offline speech recognition (whisper.cpp) |
-| **Updates** | Signed auto-update from the tray menu |
+| Feature | macOS Dynamic Island | Standard Windows Taskbar | Third-Party Widget Bars | Winsle |
+|---|---|---|---|---|
+| **Platform** | macOS only (hardware pill) | Windows 10 / 11 | Windows | Windows 10 / 11 (64-bit) |
+| **Coding Cockpit** | No | No | No | **Yes** (Claude Code & Antigravity live steps, tool approvals) |
+| **Account Auth** | Cloud Apple ID | Microsoft Account | Vendor accounts | **100% Local OAuth PKCE & Credential Manager** |
+| **Phone Link** | Apple Ecosystem only | Phone Link (cloud-heavy) | Rare | **Direct LAN Wi-Fi QR pairing (no mobile app)** |
+| **Voice Commands** | Siri (cloud) | Cortana / Copilot (cloud) | None | **Offline Push-to-Talk (whisper.cpp)** |
+| **Resource Usage** | OS Native | System process | ~300 MB–800 MB RAM | **~25–60 MB RAM (idle), runs on 2 GB RAM PCs** |
+| **Telemetry & Ads** | Apple analytics | Windows diagnostic data | Frequently ad-supported | **Zero telemetry, zero trackers, open source** |
 
-Full list: [docs/FEATURES.md](docs/FEATURES.md).
+---
 
-## Shortcuts
+## System Requirements
 
-| Keys | Action |
-|---|---|
-| `Ctrl+Alt+K` | Command palette |
-| `Ctrl+Alt+L` | Lock island (ghost mode, click-through) |
-| `Ctrl+Alt+C` | Pick colour under cursor |
-| `Ctrl+Alt+Space` | Quick capture (falls back to `Ctrl+Alt+N`) |
-| `Ctrl+Alt+W` | Show / hide the island |
-| `Ctrl+Alt+F` | Start, pause or resume a focus session |
-| `Ctrl+Alt+V` | Clipboard history |
-| `Ctrl+Alt+J` (hold) | Voice command |
-| Scroll on the capsule | System volume |
+### Runtime Requirements
+* **Operating System:** Windows 10 or Windows 11 (64-bit, x64).
+* **Hardware:** Any modern dual-core CPU and at least 2 GB of RAM. Winsle is designed to stay tiny and silent in the background.
+* **WebView2 Runtime:** Included with Windows 10/11. The standalone setup installer automatically embeds the bootstrapper if missing.
 
-## Repository layout
+### Build & Development Requirements
+If compiling from source:
+* **Node.js:** v20.0.0 or higher ([nodejs.org](https://nodejs.org))
+* **Rust:** Stable toolchain (`x86_64-pc-windows-msvc`) installed via [rustup.rs](https://rustup.rs)
+* **Visual Studio C++ Build Tools:** Desktop development with C++ (MSVC compiler and Windows 10/11 SDK)
+* **Git:** For cloning and version management
 
-```
-winsle/
-├── app/                      Tauri 2 application
-│   ├── src/                  TypeScript island (no framework)
-│   │   ├── core/             bridge to Rust, state, layout, sound, animation
-│   │   ├── island/           window controller, state machine, hook events
-│   │   ├── live/             live activities: store, views, widgets, compact strip
-│   │   ├── mochi/            the character: renderer, greeting, mini bots
-│   │   ├── settings/         settings window
-│   │   ├── upload/           drag-and-drop sequence
-│   │   └── views/            shared DOM helpers, icons, chat, integrations
-│   ├── src-tauri/            Rust backend
-│   │   └── src/live/         OS pollers: media, system, privacy, progress,
-│   │                         notifications, calendar, capture, extras, tools
-│   ├── hook/                 winsle-hook.exe, the Claude Code relay
-│   ├── sounds/               UI sounds
-│   ├── scripts/              icon generation and packaging
-│   └── dev-preview/          standalone preview pages for `npm run dev`
-├── scripts/
-│   ├── toggle-winsle.ps1     start / stop (desktop shortcut target)
-│   ├── hooks/                Claude Code and Antigravity hook linking
-│   └── dev/                  screenshot, cursor, hotkey and memory probes
-└── docs/                     architecture, features, building, privacy
-```
+---
 
-## Install
+## Install & Quick Start
 
-1. Download `Winsle_x.y.z_x64-setup.exe` from [Releases](../../releases).
-2. Run it. No admin rights needed; WebView2 is installed automatically if missing.
-3. Settings opens on first launch. Connect what you use (Spotify, Google, Outlook, phone, voice). Everything is optional.
+### 1. Pre-built Executable (Recommended)
+1. Download `Winsle_x.y.z_x64-setup.exe` from [Releases](https://github.com/IntellectDaksh/Winsle/releases).
+2. Run the installer. No administrative privileges required.
+3. On first launch, the Settings window opens automatically so you can configure optional modules (Spotify, Calendar, Phone Link, Voice).
+> *Note on Windows SmartScreen:* Unsigned builds may trigger a SmartScreen alert. Click **More info → Run anyway**.
 
-Windows SmartScreen may warn on unsigned builds: **More info → Run anyway**.
-
-## Connect your accounts
-
-Each user signs in with their **own** account from Settings. No keys are shipped in the source, and nobody has to paste API keys.
-
-| Service | How |
-|---|---|
-| Spotify | Settings → Spotify → Connect |
-| Google Calendar / Outlook | Settings → Calendar → Connect Google / Connect Outlook |
-| Any calendar (iCal link) | Settings → Calendar → paste the secret iCal address |
-| GitHub, Vercel, Stripe, Notion, Resend, Cal.com, n8n | Settings → Integrations → paste a token |
-| Phone | Settings → Phone link → scan the QR code |
-
-Power users can also put keys in a `.env` file next to `winsle.exe` (see [app/.env.example](app/.env.example)). `.env` is gitignored.
-
-## Build from source
-
+### 2. Build from Source
 ```bash
-cd app
+# 1. Clone the repository
+git clone https://github.com/IntellectDaksh/Winsle.git
+cd Winsle/app
+
+# 2. Install frontend dependencies
 npm install
-npm run tauri dev      # live reload
-npm run pack           # installer in app/release/
+
+# 3. Run in live development mode
+npm run tauri dev
+
+# 4. Compile a standalone release package
+npm run pack
+```
+Compiled setup installers and standalone binaries land in `app/release/` and `app/src-tauri/target/release/winsle.exe`.
+
+---
+
+## Authentication & Account Setup
+
+Winsle never ships with bundled API keys or shared cloud credentials. Every integration connects through direct OAuth PKCE on your machine or uses local keys stored in the **Windows Credential Manager**.
+
+### Method 1: One-Click In-App Sign-In (Settings UI)
+Open Winsle Settings (`Right-click tray icon → Settings` or `Ctrl+Alt+K → Settings`):
+
+| Service | How to Connect | Auth Mechanism |
+|---|---|---|
+| **Spotify** | Settings → Spotify → **Connect** | OAuth 2.0 PKCE (`http://127.0.0.1:8898/callback`). Like, queue, seek, and playlist controls. |
+| **Google Calendar** | Settings → Calendar → **Connect Google** | Google OAuth Desktop Client. Reads agenda for next 24h, 1-click meeting join, RSVP. |
+| **Outlook Calendar** | Settings → Calendar → **Connect Outlook** | Microsoft Graph OAuth Public Client (`http://127.0.0.1/callback`). |
+| **Any iCal Calendar** | Settings → Calendar → Paste iCal secret URL | Private ICS subscription URL (Google, Apple iCloud, Proton, Outlook). |
+| **Integrations** | Settings → Integrations → Paste API Token | Tokens for GitHub, Vercel, Stripe, Notion, Resend, Cal.com, n8n. |
+
+---
+
+### Method 2: Optional `.env` Fallback (Power Users)
+If you prefer configuring credentials via files or automated dotfiles, copy [`app/.env.example`](app/.env.example) to `.env` in the working directory (or alongside `winsle.exe`).
+
+> **Safety Notice:** `.env` and all credential patterns are strictly `.gitignore`'d. Never commit private keys.
+
+```env
+# ==========================================
+# Winsle Environment Configuration (.env)
+# ==========================================
+
+# Calendar: Google Calendar > Settings > "Secret address in iCal format"
+WINSLE_CALENDAR_ICS_URL=
+
+# AI Chat & Assistants
+WINSLE_ANTHROPIC_API_KEY=
+
+# Developer & Cloud Integrations (All Optional)
+WINSLE_GITHUB_TOKEN=
+WINSLE_VERCEL_TOKEN=
+WINSLE_STRIPE_API_KEY=
+WINSLE_RESEND_API_KEY=
+WINSLE_NOTION_API_KEY=
+WINSLE_CALCOM_API_KEY=
+WINSLE_N8N_URL=
+WINSLE_N8N_API_KEY=
+
+# Custom OAuth Application IDs (Optional overrides for custom builds)
+WINSLE_SPOTIFY_CLIENT_ID=
+WINSLE_GOOGLE_CLIENT_ID=
+WINSLE_GOOGLE_CLIENT_SECRET=
+WINSLE_MICROSOFT_CLIENT_ID=
 ```
 
-Needs Node 20+, Rust stable (MSVC) and the VS C++ build tools. Full instructions: [docs/BUILDING.md](docs/BUILDING.md).
+---
 
-## Releasing (maintainers)
+### Method 3: Registering Your Own OAuth Apps
+If you are maintaining your own build or want dedicated API quotas, register apps in the official developer consoles:
 
-Push a tag `vX.Y.Z` (matching `tauri.conf.json`). `.github/workflows/release.yml` builds, signs the updater artifacts and creates a draft release with `latest.json`. Repository secrets it reads:
+#### 1. Spotify Web API
+1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create an app.
+2. Select **Web API**.
+3. Set the Redirect URI to exactly:
+   ```text
+   http://127.0.0.1:8898/callback
+   ```
+4. Copy the **Client ID** into `WINSLE_SPOTIFY_CLIENT_ID` in `.env` (PKCE: no client secret required).
+5. Scopes used: `user-library-read user-library-modify user-modify-playback-state user-read-playback-state playlist-read-private`.
 
-| Secret | Purpose |
+#### 2. Google Calendar API
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and create a project.
+2. Under **APIs & Services → Library**, enable the **Google Calendar API**.
+3. Configure the **OAuth consent screen** (External, app name: "Winsle", scope: `https://www.googleapis.com/auth/calendar.events`).
+4. Go to **Credentials → Create Credentials → OAuth client ID → Desktop app**.
+5. Save the generated Client ID and Client Secret into `WINSLE_GOOGLE_CLIENT_ID` and `WINSLE_GOOGLE_CLIENT_SECRET`.
+
+#### 3. Microsoft Outlook (Microsoft Graph)
+1. Navigate to the [Microsoft Entra Admin Center](https://entra.microsoft.com/) → **App registrations → New registration**.
+2. Select **Accounts in any organizational directory and personal Microsoft accounts** (tenant `common`).
+3. Under **Authentication → Add a platform → Mobile and desktop applications**, set redirect URI to:
+   ```text
+   http://127.0.0.1/callback
+   ```
+4. Under **Advanced settings**, toggle **Allow public client flows = Yes**.
+5. Delegated permissions needed: `Calendars.ReadWrite`, `offline_access`, `User.Read`.
+6. Copy Application (Client) ID into `WINSLE_MICROSOFT_CLIENT_ID`.
+
+---
+
+## Phone Link (Zero-Install LAN Bridge)
+
+Pair any smartphone to Winsle without installing an app from the App Store or Play Store:
+
+1. In Winsle Settings, enable **Phone link** (listens locally on `0.0.0.0:8899`).
+2. Allow Windows Firewall on **Private networks**.
+3. Connect your phone to the same Wi-Fi network and scan the generated **QR code** (or navigate to `http://<your-pc-ip>:8899`).
+4. Enter the one-time 6-digit pairing code shown in Settings.
+5. The webapp provides:
+   * **Bidirectional Clipboard:** Push text from phone to PC, copy PC clipboard to phone.
+   * **Media Remote:** Play, pause, skip, and volume controls for Windows media.
+   * **Notification Forwarding:** Bridge Android notifications via Tasker/MacroDroid or iOS Shortcuts to Winsle toasts.
+
+---
+
+## Offline Push-to-Talk Voice Commands
+
+Hold `Ctrl+Alt+J` and speak — your speech is converted to system actions offline using local `whisper.cpp`:
+* Fast transcription directly in memory without cloud dependencies.
+* Quick note capture, timer controls, app launches, and media requests.
+* Hotkey can be customized under **Settings → Voice**.
+
+---
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
 |---|---|
-| `TAURI_SIGNING_PRIVATE_KEY` | Signs updates (required) |
-| `WINSLE_SPOTIFY_CLIENT_ID` | Enables Spotify sign-in in the build |
-| `WINSLE_GOOGLE_CLIENT_ID`, `WINSLE_GOOGLE_CLIENT_SECRET` | Enables Google Calendar sign-in |
-| `WINSLE_MICROSOFT_CLIENT_ID` | Enables Outlook sign-in |
-| `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD` | Optional Authenticode signing |
+| `Ctrl+Alt+K` | Command palette (search apps, math, timers, notes, system controls) |
+| `Ctrl+Alt+L` | Lock island into Ghost mode (click-through overlay) |
+| `Ctrl+Alt+C` | Color picker under cursor |
+| `Ctrl+Alt+Space` | Quick capture note / todo (fallback: `Ctrl+Alt+N`) |
+| `Ctrl+Alt+W` | Show / Hide the dynamic island |
+| `Ctrl+Alt+F` | Start, pause, or resume Pomodoro focus session |
+| `Ctrl+Alt+V` | Clipboard history manager |
+| `Ctrl+Alt+J` *(hold)* | Push-to-talk offline voice command |
+| *Mouse wheel on island capsule* | Adjust system volume |
 
-Registering the OAuth apps: [docs/OAUTH-SETUP.md](docs/OAUTH-SETUP.md). The auto-updater downloads from public release assets, so it only works for other people once releases are hosted in a public repo.
+---
+
+## Repository Layout
+
+```text
+Winsle/
+├── app/                          Tauri 2 application source
+│   ├── src/                      Frontend TypeScript island UI (vanilla, no bloated framework)
+│   │   ├── core/                 Native bridge, application state, sound effects, layout
+│   │   ├── island/               Dynamic island state machine, event listeners, HUD
+│   │   ├── live/                 Live activities: Spotify, Calendar, Coach, Phone, Voice
+│   │   ├── mochi/                Character renderer, animations, greeting logic
+│   │   ├── settings/             Configuration window and account connection views
+│   │   └── upload/               Drop-zone animations and file relays
+│   ├── src-tauri/                Rust backend
+│   │   ├── src/live/             OS poller threads: media, system, privacy, progress,
+│   │   │                         phone bridge, whisper voice, calendar OAuth
+│   │   ├── src/claude.rs         Claude Code API client and prompt dispatcher
+│   │   ├── src/secrets.rs        Windows Credential Manager abstraction & .env parser
+│   │   └── src/updater.rs        Signed auto-updater verification
+│   ├── hook/                     winsle-hook.exe relay for coding sessions
+│   └── sounds/                   High-fidelity tactile audio effects
+├── scripts/
+│   ├── toggle-winsle.ps1         Shortcut script to toggle or start Winsle
+│   └── hooks/                    Claude Code & Antigravity hook integration scripts
+├── docs/                         Architecture, Feature specs, OAuth guides, Phone link
+└── .github/                      Continuous integration and release workflows
+```
+
+---
+
+## FAQ
+
+**Q: Does Winsle send my clipboard or keystrokes to any server?**  
+**A:** Never. Clipboard inspection happens entirely in local memory to format links and strip secrets. Audio streams from push-to-talk run through local whisper.cpp and never leave RAM.
+
+**Q: How does the Claude Code and Antigravity integration work?**  
+**A:** Winsle registers lightweight hooks in `~/.claude/settings.json` and `~/.gemini/config/hooks.json`. Whenever a tool execution starts or prompts for approval, `winsle-hook.exe` broadcasts a local event to the island so you can approve actions directly from your desktop header.
+
+**Q: Can I run Winsle without any third-party accounts?**  
+**A:** Yes. Spotify, Google, Outlook, Phone Link, and Voice are 100% modular. If disabled, Winsle operates purely as a local system monitor, clipboard manager, and coding session HUD.
+
+---
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md): how the island, the pollers and the hook relay fit together
-- [Features](docs/FEATURES.md): everything the island can show and do
-- [Building](docs/BUILDING.md): toolchain, build, tests, packaging
-- [Privacy](docs/PRIVACY.md): what is stored, where, and what never leaves the PC
-- [OAuth setup](docs/OAUTH-SETUP.md): registering Spotify, Google and Microsoft apps
-- [Phone link](docs/PHONE.md): pairing, automations, firewall
+* [Architecture Guide](docs/ARCHITECTURE.md): Deep dive into Tauri 2, thread safety, and IPC pipes.
+* [Feature Index](docs/FEATURES.md): Comprehensive breakdown of all island widgets.
+* [OAuth Setup Details](docs/OAUTH-SETUP.md): Step-by-step developer portal guides.
+* [Phone Link Spec](docs/PHONE.md): Local LAN bridge endpoints and Tasker/Shortcuts examples.
+* [Privacy Policy](docs/PRIVACY.md): Detailed breakdown of storage and security guarantees.
+
+---
 
 ## License
 
-[MIT](LICENSE)
+Distributed under the [MIT License](LICENSE).
