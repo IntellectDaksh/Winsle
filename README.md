@@ -198,34 +198,6 @@ Hold `Ctrl+Alt+J` and speak — your speech is converted to system actions offli
 | `Ctrl+Alt+J` *(hold)* | Push-to-talk offline voice command |
 | *Mouse wheel on island capsule* | Adjust system volume |
 
----
-
-## Repository Layout
-
-```text
-Winsle/
-├── app/                          Tauri 2 application source
-│   ├── src/                      Frontend TypeScript island UI (vanilla, no bloated framework)
-│   │   ├── core/                 Native bridge, application state, sound effects, layout
-│   │   ├── island/               Dynamic island state machine, event listeners, HUD
-│   │   ├── live/                 Live activities: Spotify, Calendar, Coach, Phone, Voice
-│   │   ├── mochi/                Character renderer, animations, greeting logic
-│   │   ├── settings/             Configuration window and account connection views
-│   │   └── upload/               Drop-zone animations and file relays
-│   ├── src-tauri/                Rust backend
-│   │   ├── src/live/             OS poller threads: media, system, privacy, progress,
-│   │   │                         phone bridge, whisper voice, calendar OAuth
-│   │   ├── src/claude.rs         Claude Code API client and prompt dispatcher
-│   │   ├── src/secrets.rs        Windows Credential Manager abstraction & .env parser
-│   │   └── src/updater.rs        Signed auto-updater verification
-│   ├── hook/                     winsle-hook.exe relay for coding sessions
-│   └── sounds/                   High-fidelity tactile audio effects
-├── scripts/
-│   ├── toggle-winsle.ps1         Shortcut script to toggle or start Winsle
-│   └── hooks/                    Claude Code & Antigravity hook integration scripts
-├── docs/                         Architecture, Feature specs, OAuth guides, Phone link
-└── .github/                      Continuous integration and release workflows
-```
 
 ---
 
