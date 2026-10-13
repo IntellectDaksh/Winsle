@@ -29,12 +29,21 @@ Output: `app/target/release/winsle.exe`.
 
 ## Tests
 
+### Backend (Rust)
 ```bash
 cd app/src-tauri
 cargo test --release --lib
 ```
 
 Some tests read real system values; they are marked `#[ignore]` and can be run with `-- --ignored`.
+
+### Frontend & Live Modules (Node.js)
+```bash
+cd app
+npm test             # runs all unit tests
+npm run test:calc    # palette math and unit converter tests
+npm run test:lyrics  # LRC parser and binary search lookup tests
+```
 
 ## Front-end only
 
@@ -47,14 +56,14 @@ Opens the island in a browser. Bridge calls are no-ops there, so layout and view
 
 ## Running
 
-- `scripts/toggle-winsle.ps1` starts or stops the app and re-links the hooks. Point a desktop shortcut at it:
+- `scripts/toggle-winsle.ps1` starts or stops the app and re-links the hooks. Automatically searches dev builds and installed binaries. Point a desktop shortcut at it:
 
   ```
   powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "<repo>\scripts\toggle-winsle.ps1"
   ```
 
 - `scripts/hooks/link-hooks.mjs` merges Winsle's hooks into Claude Code and Antigravity, backing up each file first.
-- `scripts/dev/` has small probes used while developing: `shot.ps1` (screenshot of the top of the screen), `mouse.ps1` (move / click), `keys.ps1` (send `Ctrl+Alt+<key>`), `mem.ps1` (memory of Winsle and its WebView2 processes).
+- `scripts/dev/` has small probes used while developing: `sessions.ps1` (inspect active AI sessions and hook pipe), `shot.ps1` (screenshot of the top of the screen), `mouse.ps1` (move / click), `keys.ps1` (send `Ctrl+Alt+<key>`), `mem.ps1` (memory of Winsle and its WebView2 processes).
 
 ## Data locations
 
