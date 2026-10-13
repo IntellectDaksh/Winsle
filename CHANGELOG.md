@@ -3,6 +3,12 @@
 ## 0.4.0
 
 ### Added
+- Account sign-in: Spotify, Google Calendar, and Outlook OAuth PKCE sign-in with local token persistence in Windows Credential Manager.
+- Phone link: pair any smartphone over local Wi-Fi via QR code for clipboard sync, media controls, and notification forwarding.
+- Focus guard & coach: automatic app and site minimization during focus sessions with nightly recaps and weekly stats.
+- Offline voice commands: push-to-talk (`Ctrl+Alt+J`) offline speech recognition powered by whisper.cpp.
+- Signed auto-updater: background update verification and desktop installer bootstrapper.
+- Environment fallback: optional `.env` support for API keys and configuration.
 - Assistant (local mini agent): plain-language requests for reminders, timers, focus, tasks, media, volume, Do not disturb, calendar, screen time, journal and PC lock, handled by fast local rules; anything else goes to a local Ollama model that answers or uses one tool. Nothing leaves the PC.
 - Reminders: "remind me in 20 min to…" / "at 5pm…", with snooze and a countdown list.
 - Automations: focus pauses music, meetings pause music, app limits start a break, morning briefing, evening journal (journal.md).
@@ -17,6 +23,8 @@
 - Header: Assistant, Coding, Media, Timer, Calendar, Notifications and a More launcher; dark tooltips.
 
 ### Fixed
+- Fixed notification stream stopping when Windows resets its notification database.
+- Fixed repeated flashes not redrawing properly.
 - The palette and quick capture now reliably take the keyboard when another app is in front.
 - Local AI is never started when RAM is already above 88 %, and a broken Ollama install is reported instead of retried.
 
@@ -48,20 +56,3 @@
 - Quiet mode while a calendar event is running.
 - Media seek, volume slider and mute.
 - System view: CPU / RAM graph, disk space, network throughput, uptime, battery, heaviest apps.
-- Calendar: more events, day separators, "free until" summary, copy meeting link.
-- Downloads: open, show in folder and a persistent recently finished list.
-- Home tiles for last copied text and inbox tasks.
-- Habits & privacy section in Settings.
-- Starts with Windows by default.
-
-### Fixed
-- Downloads that finish in under a second, or that the browser renames mid-way, are now announced.
-- Long calendar blocks (sleep, all-day) no longer count as meetings.
-
-### Changed
-- Lower idle memory: GPU work runs in the WebView2 browser process.
-
-## 0.1.1
-
-- Live activities: media, timer, calendar, downloads and renders, notifications, system, mic / camera, quick capture.
-- Claude Code and Antigravity sessions, approvals and questions.
