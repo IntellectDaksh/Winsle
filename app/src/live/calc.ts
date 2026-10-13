@@ -85,12 +85,14 @@ const UNITS: Record<string, [string, number]> = {
   g: ["mass", 0.001], kg: ["mass", 1], lb: ["mass", 0.45359237], oz: ["mass", 0.028349523],
   ml: ["vol", 0.001], l: ["vol", 1], gal: ["vol", 3.785411784],
   kb: ["data", 1e3], mb: ["data", 1e6], gb: ["data", 1e9], tb: ["data", 1e12],
+  kib: ["data", 1024], mib: ["data", 1024 ** 2], gib: ["data", 1024 ** 3], tib: ["data", 1024 ** 4],
   s: ["time", 1], min: ["time", 60], h: ["time", 3600], day: ["time", 86400],
   kmh: ["speed", 1 / 3.6], mph: ["speed", 0.44704],
 };
 const DEFAULT_TO: Record<string, string> = {
   km: "mi", mi: "km", m: "ft", ft: "m", cm: "in", in: "cm", kg: "lb", lb: "kg", g: "oz", oz: "g",
-  l: "gal", gal: "l", kmh: "mph", mph: "kmh", c: "f", f: "c", gb: "mb", mb: "gb",
+  l: "gal", gal: "l", kmh: "mph", mph: "kmh", c: "f", f: "c", k: "c", gb: "mb", mb: "gb",
+  kib: "mib", mib: "gib", gib: "mib", tib: "gib",
 };
 
 function fmt(n: number): string {
@@ -107,6 +109,10 @@ export function convert(src: string): string | null {
   if (!Number.isFinite(v) || !to) return null;
   if (from === "c" && to === "f") return `${fmt(v * 9 / 5 + 32)} °F`;
   if (from === "f" && to === "c") return `${fmt((v - 32) * 5 / 9)} °C`;
+  if (from === "c" && to === "k") return `${fmt(v + 273.15)} K`;
+  if (from === "k" && to === "c") return `${fmt(v - 273.15)} °C`;
+  if (from === "f" && to === "k") return `${fmt((v - 32) * 5 / 9 + 273.15)} K`;
+  if (from === "k" && to === "f") return `${fmt((v - 273.15) * 9 / 5 + 32)} °F`;
   const a = UNITS[from];
   const b = UNITS[to];
   if (!a || !b || a[0] !== b[0]) return null;
