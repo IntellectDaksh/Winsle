@@ -8,11 +8,13 @@
   ![CI](https://github.com/IntellectDaksh/Winsle/actions/workflows/ci.yml/badge.svg)
   ![Release](https://img.shields.io/github/v/release/IntellectDaksh/Winsle)
   ![License](https://img.shields.io/badge/license-MIT-blue)
-  ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011%20x64-informational)
+  ![Platform](https://img.shields.io/badge/platform-Windows%20Only%20(10%20%2F%2011%2064--bit)-informational)
   ![Built with](https://img.shields.io/badge/built%20with-Tauri%202%20%2B%20Rust-orange)
 </div>
 
 Winsle brings a fluid, interactive dynamic island to Windows. It sits subtly at the top of your desktop, follows your active **Claude Code** and **Antigravity** coding sessions, and surfaces live system activities: Spotify playback, calendar agendas, phone notifications, download/render progress, clipboard history, focus sessions, screen-time stats, and push-to-talk voice dictation.
+
+> **Windows Exclusive (For Now):** Winsle is built and tuned specifically for **Windows 10 and Windows 11 (64-bit)**. macOS and Linux are **not supported** at this time.
 
 **Local-first by design.** No cloud server, no telemetry, and no Winsle account. The network is only touched for services you explicitly link, the optional keyless Spotify lyrics lookup (`lrclib.net`), and signed updater checks. Tokens and keys reside strictly in the **Windows Credential Manager** or your local `.env`, never in code.
 
@@ -21,8 +23,9 @@ Winsle brings a fluid, interactive dynamic island to Windows. It sits subtly at 
 > [!IMPORTANT]
 > ### ⚡ The Main Way to Install: Single-Click Executable
 > 1. **Download the Setup `.exe`:** Grab the latest `Winsle-Windows-setup.exe` from [**Releases**](https://github.com/IntellectDaksh/Winsle/releases).
-> 2. **Automatic Dependencies:** Run the installer. You **do not** need Node.js, Rust, Python, or any developer tools installed. All runtimes and system dependencies (including Microsoft WebView2) are **automatically downloaded and configured** for you.
-> 3. **Set Up or Skip:** On first launch, the Settings window opens with options to link your accounts (Spotify, Google Calendar, Outlook, API keys). You can configure them or **skip it completely** — Winsle works right out of the box with zero keys!
+> 2. **Windows Only (10/11 64-bit):** Designed specifically for 64-bit Windows systems.
+> 3. **Automatic Dependencies:** Run the installer. You **do not** need Node.js, Rust, Python, or any developer tools installed. All runtimes and system dependencies (including Microsoft WebView2) are **automatically downloaded and configured** for you.
+> 4. **Set Up or Skip:** On first launch, the Settings window opens with options to link your accounts (Spotify, Google Calendar, Outlook, API keys). You can configure them or **skip it completely** — Winsle works right out of the box with zero keys!
 
 ---
 
@@ -30,7 +33,7 @@ Winsle brings a fluid, interactive dynamic island to Windows. It sits subtly at 
 
 | Feature | macOS Dynamic Island | Standard Windows Taskbar | Third-Party Widget Bars | Winsle |
 |---|---|---|---|---|
-| **Platform** | macOS only (hardware pill) | Windows 10 / 11 | Windows | Windows 10 / 11 (64-bit) |
+| **Platform** | macOS only (hardware pill) | Windows 10 / 11 | Windows | **Windows 10 / 11 (Windows only for now)** |
 | **Coding Cockpit** | No | No | No | **Yes** (Claude Code & Antigravity live steps, tool approvals) |
 | **Account Auth** | Cloud Apple ID | Microsoft Account | Vendor accounts | **100% Local OAuth PKCE & Credential Manager** |
 | **Phone Link** | Apple Ecosystem only | Phone Link (cloud-heavy) | Rare | **Direct LAN Wi-Fi QR pairing (no mobile app)** |
@@ -42,8 +45,8 @@ Winsle brings a fluid, interactive dynamic island to Windows. It sits subtly at 
 
 ## System Requirements
 
-### Everyday Users (Standard Setup)
-* **Operating System:** Windows 10 or Windows 11 (64-bit, x64).
+### Everyday Users (Windows Only)
+* **Operating System:** Windows 10 or Windows 11 (64-bit, x64) **only**. (macOS/Linux are not supported).
 * **Hardware:** Any PC with at least 2 GB of RAM and a dual-core CPU.
 * **Dependencies:** **None to install manually.** The setup executable automatically embeds and bootstraps the Microsoft WebView2 runtime and stages all background relay binaries.
 
