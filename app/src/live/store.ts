@@ -8,6 +8,7 @@ import { Sound } from "../core/sound";
 import { State } from "../core/state";
 import { load, prefs, save, today } from "./prefs";
 import { trackChanged } from "./lyrics";
+import { isSecretText } from "./security";
 import type { AppUsage, ColorInfo, TaskLine } from "./types";
 import type {
   CalendarEvent, CalendarInfo, ClipInfo, MediaInfo, NetInfo, PowerInfo, VolumeInfo, NotifInfo, PrivacyInfo, ProgressItem, ProgressInfo, SysInfo,
@@ -387,6 +388,7 @@ class LiveStore {
 
   private addClip(text: string) {
     if (!prefs().clipHistory) return;
+    if (isSecretText(text)) return;
     const old = this.clips.find((c) => c.text === text);
     const rest = this.clips.filter((c) => c.text !== text);
     const pinned = rest.filter((c) => c.pinned);
@@ -695,6 +697,7 @@ class LiveStore {
         this.ownClip = null;
         return;
       }
+      if (isSecretText(c.text)) return;
       this.addClip(c.text);
       // Not while typing into the island itself, and never over a more important flash.
       if (State.mode === "expanded" && (State.view === "prompt" || State.view === "capture")) return;
