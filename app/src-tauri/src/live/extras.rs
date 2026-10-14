@@ -253,7 +253,14 @@ fn clip_text(raw: &str) -> Option<String> {
 }
 
 fn looks_secret(t: &str) -> bool {
-    const PREFIXES: [&str; 5] = ["sk-", "ghp_", "xox", "AKIA", "eyJ"];
+    // PEM private key blocks (e.g. RSA, EC, OPENSSH)
+    if t.starts_with("-----BEGIN") && t.contains("PRIVATE KEY-----") {
+        return true;
+    }
+    const PREFIXES: &[&str] = &[
+        "sk-", "ghp_", "github_pat_", "gho_", "ghu_", "ghs_", "glpat-",
+        "xox", "xoxb-", "xoxp-", "xapp-", "AKIA", "AIza", "eyJ",
+    ];
     if PREFIXES.iter().any(|p| t.starts_with(p)) {
         return true;
     }
@@ -421,6 +428,10 @@ mod tests {
     fn secrets_filtered() {
         assert!(clip_text("sk-abc").is_none());
         assert!(clip_text("  ghp_x  ").is_none());
+        assert!(clip_text("github_pat_11AAAA").is_none());
+        assert!(clip_text("glpat-abcdef123").is_none());
+        assert!(clip_text("AIzaSyD-1234").is_none());
+        assert!(clip_text("-----BEGIN RSA PRIVATE KEY-----\nMIIE").is_none());
         assert!(clip_text("eyJhbGciOi").is_none());
         assert!(clip_text("a1b2c3d4e5f6g7h8i9j0").is_none());
         assert!(clip_text("   \n").is_none());
