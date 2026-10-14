@@ -29,6 +29,17 @@ test("evaluate: non-calculation inputs return null", () => {
   assert.equal(evaluate("10 / 0"), null);
 });
 
+test("evaluate: handles deeply nested expressions safely without stack overflow DoS", () => {
+  // Moderate nesting works fine
+  assert.equal(evaluate("(((((1 + 2) * 3) + 4) * 5) + 6)"), "71");
+  // Deeply nested parentheses exceeding MAX_DEPTH (32) return null safely without throwing RangeError
+  const deepNest = "(".repeat(50) + "1 + 1" + ")".repeat(50);
+  assert.equal(evaluate(deepNest), null);
+  // Excessively long input string returns null
+  const longInput = "1 + ".repeat(200) + "1";
+  assert.equal(evaluate(longInput), null);
+});
+
 test("convert: distance, mass, and data", () => {
   assert.equal(convert("1 km to m"), "1000 m");
   assert.equal(convert("1 m to cm"), "100 cm");

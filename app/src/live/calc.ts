@@ -11,35 +11,46 @@ const CONSTS: Record<string, number> = { pi: Math.PI, e: Math.E };
 export function evaluate(src: string): string | null {
   const s = src.replace(/,/g, "").replace(/×/g, "*").replace(/÷/g, "/").trim().toLowerCase();
   // Needs an operator or a function: a bare number is a timer, not a sum.
-  if (!s || !/[+\-*/^%()]|sqrt|abs|round|floor|ceil|sin|cos|tan|log|ln/.test(s) || /^\d+\s*m(in)?$/.test(s)) return null;
+  // Limit input length and recursion depth to prevent stack overflow / CPU exhaustion DoS
+  if (!s || s.length > 512 || !/[+\-*/^%()]|sqrt|abs|round|floor|ceil|sin|cos|tan|log|ln/.test(s) || /^\d+\s*m(in)?$/.test(s)) return null;
   let i = 0;
+  let depth = 0;
+  const MAX_DEPTH = 32;
+
   const peek = () => s[i];
   const ws = () => { while (s[i] === " ") i++; };
   const fail = (): never => { throw new Error("bad"); };
+  const enter = () => { if (++depth > MAX_DEPTH) fail(); };
+  const leave = () => { depth--; };
 
   function primary(): number {
-    ws();
-    if (peek() === "(") {
-      i++;
-      const v = expr();
+    enter();
+    try {
       ws();
-      if (peek() !== ")") fail();
-      i++;
-      return v;
+      if (peek() === "(") {
+        i++;
+        const v = expr();
+        ws();
+        if (peek() !== ")") fail();
+        i++;
+        return v;
+      }
+      if (peek() === "-") { i++; return -primary(); }
+      if (peek() === "+") { i++; return primary(); }
+      const num = /^\d*\.?\d+(e[+-]?\d+)?/.exec(s.slice(i));
+      if (num) { i += num[0].length; return parseFloat(num[0]); }
+      const id = /^[a-z]+/.exec(s.slice(i));
+      if (id) {
+        i += id[0].length;
+        if (id[0] in CONSTS) return CONSTS[id[0]];
+        const f = FUNCS[id[0]];
+        if (!f) fail();
+        return f(primary());
+      }
+      return fail();
+    } finally {
+      leave();
     }
-    if (peek() === "-") { i++; return -primary(); }
-    if (peek() === "+") { i++; return primary(); }
-    const num = /^\d*\.?\d+(e[+-]?\d+)?/.exec(s.slice(i));
-    if (num) { i += num[0].length; return parseFloat(num[0]); }
-    const id = /^[a-z]+/.exec(s.slice(i));
-    if (id) {
-      i += id[0].length;
-      if (id[0] in CONSTS) return CONSTS[id[0]];
-      const f = FUNCS[id[0]];
-      if (!f) fail();
-      return f(primary());
-    }
-    return fail();
   }
   function power(): number {
     const b = primary();
