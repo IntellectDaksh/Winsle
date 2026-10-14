@@ -21,8 +21,11 @@ use windows::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEM
 use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-const BLOCKED: [&str; 14] =
-    ["exe", "msi", "bat", "cmd", "ps1", "vbs", "js", "jse", "wsf", "scr", "com", "lnk", "hta", "reg"];
+const BLOCKED: &[&str] = &[
+    "exe", "msi", "msp", "bat", "cmd", "ps1", "psm1", "psd1", "vbs", "vbe", "js", "jse", "wsf", "wsh",
+    "scr", "com", "lnk", "hta", "reg", "pif", "cpl", "jar", "msc", "diagcab", "appx", "msix", "iso",
+    "vhd", "vhdx", "inf", "scf",
+];
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct ProcInfo {
@@ -32,9 +35,28 @@ pub struct ProcInfo {
 }
 
 fn blocked(path: &Path) -> bool {
-    path.extension()
+    let path_str = path.to_string_lossy();
+    let trimmed = path_str.trim_end_matches(['.', ' ', '\t']);
+    let clean_path = Path::new(trimmed);
+    let ext_blocked = clean_path
+        .extension()
         .and_then(|e| e.to_str())
-        .is_some_and(|e| BLOCKED.contains(&e.to_ascii_lowercase().as_str()))
+        .is_some_and(|e| {
+            let clean_ext = e.trim().trim_end_matches('.').to_ascii_lowercase();
+            BLOCKED.contains(&clean_ext.as_str())
+        });
+    if ext_blocked {
+        return true;
+    }
+    // Guard against Windows NTFS Alternate Data Streams (e.g. payload.exe:hidden)
+    if clean_path
+        .file_name()
+        .and_then(|f| f.to_str())
+        .is_some_and(|f| f.contains(':'))
+    {
+        return true;
+    }
+    false
 }
 
 /// Shell-opens a path with its default app; no cmd.exe in between.
@@ -265,8 +287,25 @@ mod tests {
     fn refuses_executables() {
         assert!(blocked(Path::new("C:/x/setup.EXE")));
         assert!(blocked(Path::new("a.ps1")));
+        // Trailing dot bypass prevention
+        assert!(blocked(Path::new("payload.exe.")));
+        assert!(blocked(Path::new("payload.bat..")));
+        // Trailing space bypass prevention
+        assert!(blocked(Path::new("script.cmd ")));
+        // Alternate Data Streams
+        assert!(blocked(Path::new("test.txt:malicious.exe")));
+        // Newly blocked dangerous Windows extensions
+        assert!(blocked(Path::new("program.pif")));
+        assert!(blocked(Path::new("control.cpl")));
+        assert!(blocked(Path::new("tool.msc")));
+        assert!(blocked(Path::new("package.appx")));
+        assert!(blocked(Path::new("package.msix")));
+        assert!(blocked(Path::new("module.psm1")));
+        assert!(blocked(Path::new("archive.iso")));
+        // Safe files
         assert!(!blocked(Path::new("movie.mp4")));
         assert!(!blocked(Path::new("README")));
+        assert!(!blocked(Path::new("notes.txt")));
     }
 
     #[test]
