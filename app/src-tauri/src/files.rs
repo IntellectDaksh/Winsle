@@ -11,6 +11,35 @@ use crate::settings;
 
 const KEEP_FOR: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 
+const WINDOWS_RESERVED_NAMES: &[&str] = &[
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
+pub(crate) fn sanitize_file_name(raw: &str) -> String {
+    let mut clean = String::with_capacity(raw.len());
+    for c in raw.chars() {
+        if c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|' || c.is_control() {
+            clean.push('_');
+        } else {
+            clean.push(c);
+        }
+    }
+    let trimmed = clean.trim().trim_end_matches('.').trim();
+    if trimmed.is_empty() || trimmed == "." || trimmed == ".." {
+        return "file".to_string();
+    }
+    let stem = Path::new(trimmed)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(trimmed);
+    if WINDOWS_RESERVED_NAMES.contains(&stem.to_ascii_uppercase().as_str()) {
+        return format!("_{trimmed}");
+    }
+    trimmed.to_string()
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DroppedFile {
@@ -33,10 +62,11 @@ pub fn ingest(source: &str) -> Result<DroppedFile, String> {
     let dir = inbox_dir();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
-    let name = src
+    let raw_name = src
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| "file".into());
+    let name = sanitize_file_name(&raw_name);
 
     let mut dest = dir.join(&name);
     if dest.exists() {
@@ -127,5 +157,34 @@ mod tests {
         let _ = std::fs::remove_file(&first.path);
         let _ = std::fs::remove_file(&second.path);
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_sanitize_file_name() {
+        // Safe filenames remain intact
+        assert_eq!(sanitize_file_name("document.pdf"), "document.pdf");
+        assert_eq!(sanitize_file_name("notes 2026.txt"), "notes 2026.txt");
+
+        // Windows reserved device names get prefixed to avoid DOS driver conflicts
+        assert_eq!(sanitize_file_name("con.txt"), "_con.txt");
+        assert_eq!(sanitize_file_name("CON"), "_CON");
+        assert_eq!(sanitize_file_name("nul.dat"), "_nul.dat");
+        assert_eq!(sanitize_file_name("AUX"), "_AUX");
+        assert_eq!(sanitize_file_name("prn.doc"), "_prn.doc");
+        assert_eq!(sanitize_file_name("com1.log"), "_com1.log");
+        assert_eq!(sanitize_file_name("lpt3.bin"), "_lpt3.bin");
+
+        // Illegal Windows path characters and control chars replaced
+        assert_eq!(sanitize_file_name("foo/bar:baz*qux?.txt"), "foo_bar_baz_qux_.txt");
+        assert_eq!(sanitize_file_name("hello\0world.txt"), "hello_world.txt");
+
+        // Trailing dots and spaces trimmed
+        assert_eq!(sanitize_file_name("report.pdf..."), "report.pdf");
+        assert_eq!(sanitize_file_name("trailing space.txt "), "trailing space.txt");
+
+        // Empty / traversal only falls back to "file"
+        assert_eq!(sanitize_file_name(""), "file");
+        assert_eq!(sanitize_file_name(".."), "file");
+        assert_eq!(sanitize_file_name("."), "file");
     }
 }
