@@ -142,13 +142,31 @@ fn reposition(app: AppHandle, shared: State<Shared>) {
     island::apply_geometry(&app, &pref, collapsed);
 }
 
+pub(crate) fn is_safe_web_url(raw: &str) -> bool {
+    let s = raw.trim();
+    if s.is_empty() || s.len() > 2048 {
+        return false;
+    }
+    // Reject shell-injection vectors: control characters, quotes, and whitespace
+    if s.chars().any(|c| c.is_control() || c == '"' || c == '\'' || c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+        return false;
+    }
+    if let Ok(parsed) = tauri::Url::parse(s) {
+        let scheme = parsed.scheme();
+        if (scheme == "http" || scheme == "https") && parsed.has_host() {
+            return true;
+        }
+    }
+    false
+}
+
 #[tauri::command]
 fn open_url(url: String) {
-    if !(url.starts_with("http://") || url.starts_with("https://")) {
+    if !is_safe_web_url(&url) {
         return;
     }
     let _ = Command::new("rundll32.exe")
-        .args(["url.dll,FileProtocolHandler", &url])
+        .args(["url.dll,FileProtocolHandler", url.trim()])
         .creation_flags(CREATE_NO_WINDOW)
         .spawn();
 }
@@ -529,4 +547,28 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Winsle");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_safe_web_url() {
+        // Valid web urls
+        assert!(is_safe_web_url("https://example.com"));
+        assert!(is_safe_web_url("http://localhost:3000/path?query=1#frag"));
+        assert!(is_safe_web_url("https://sub.domain.org/api/v1"));
+
+        // Dangerous / injection attempts
+        assert!(!is_safe_web_url(""));
+        assert!(!is_safe_web_url("   "));
+        assert!(!is_safe_web_url("javascript:alert(1)"));
+        assert!(!is_safe_web_url("file:///C:/Windows/System32/cmd.exe"));
+        assert!(!is_safe_web_url("https://example.com\" & calc.exe"));
+        assert!(!is_safe_web_url("https://example.com/foo bar"));
+        assert!(!is_safe_web_url("https://example.com\ncalc.exe"));
+        assert!(!is_safe_web_url("https://"));
+        assert!(!is_safe_web_url("http://"));
+    }
 }
