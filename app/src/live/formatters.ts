@@ -94,4 +94,4 @@ export {
   isNoise,
   sanitizeNotificationText,
   appColor,
-} from "./notif-utils";
+} from "./notif-utils.ts";
