@@ -28,6 +28,7 @@ jobs:
 
       - run: npm ci
       - run: npx tsc --noEmit
+      - run: npm test
       - run: npx vite build
       - run: cargo build --release -p winsle-hook
       - run: cargo test --release --lib
