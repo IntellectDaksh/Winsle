@@ -6,23 +6,25 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 
-const event = process.argv[2];
-const HOOK = join(process.env.LOCALAPPDATA ?? "", "Winsle", "bin", "winsle-hook.exe");
-const done = () => { process.stdout.write("{}\n"); process.exit(0); };
-setTimeout(done, 2500).unref(); // never hold Antigravity up
+export const ALLOWED_HOOK_EVENTS = new Set([
+  "PreToolUse",
+  "PostToolUse",
+  "PostToolUseFailure",
+  "Start",
+  "Stop",
+  "StopFailure",
+  "UserPromptSubmit",
+  "SessionStart",
+  "SessionEnd",
+]);
 
-let raw = "";
-process.stdin.on("data", (c) => (raw += c));
-process.stdin.on("end", () => {
-  let p;
-  try { p = JSON.parse(raw.replace(/^﻿/, "")); } catch { return done(); }
-
+export function buildHookPayload(event, p = {}) {
   const a = p.toolCall?.args ?? {};
   let name = event;
   if (event === "PostToolUse" && p.error) name = "PostToolUseFailure";
   if (event === "Stop" && p.error) name = "StopFailure";
 
-  const out = {
+  return {
     hook_event_name: name,
     session_id: `agy-${p.conversationId ?? ""}`,
     cwd: a.Cwd || p.workspacePaths?.[0] || "",
@@ -35,9 +37,29 @@ process.stdin.on("end", () => {
     },
     message: name === "Stop" ? "Antigravity done" : undefined,
   };
+}
 
-  const child = spawn(HOOK, [name], { stdio: ["pipe", "ignore", "ignore"], windowsHide: true });
-  child.on("error", done);
-  child.on("exit", done);
-  child.stdin.end(JSON.stringify(out));
-});
+// Only run CLI listener when invoked directly
+if (process.argv[1]?.endsWith("antigravity-bridge.mjs")) {
+  const event = process.argv[2];
+  const HOOK = join(process.env.LOCALAPPDATA ?? "", "Winsle", "bin", "winsle-hook.exe");
+  const done = () => { process.stdout.write("{}\n"); process.exit(0); };
+  setTimeout(done, 2500).unref(); // never hold Antigravity up
+
+  if (!event || !ALLOWED_HOOK_EVENTS.has(event)) {
+    done();
+  } else {
+    let raw = "";
+    process.stdin.on("data", (c) => (raw += c));
+    process.stdin.on("end", () => {
+      let p;
+      try { p = JSON.parse(raw.replace(/^\uFEFF/, "")); } catch { return done(); }
+
+      const out = buildHookPayload(event, p);
+      const child = spawn(HOOK, [out.hook_event_name], { stdio: ["pipe", "ignore", "ignore"], windowsHide: true });
+      child.on("error", done);
+      child.on("exit", done);
+      child.stdin.end(JSON.stringify(out));
+    });
+  }
+}
