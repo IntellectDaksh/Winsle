@@ -316,7 +316,17 @@ fn volume_loop(app: AppHandle) {
 }
 
 fn step_level(cur: f32, delta: f32) -> f32 {
-    (cur + delta).clamp(0.0, 1.0)
+    if !cur.is_finite() {
+        return 0.5;
+    }
+    if !delta.is_finite() {
+        return cur.clamp(0.0, 1.0);
+    }
+    let next = cur + delta;
+    if !next.is_finite() {
+        return cur.clamp(0.0, 1.0);
+    }
+    next.clamp(0.0, 1.0)
 }
 
 #[tauri::command]
@@ -470,6 +480,9 @@ mod tests {
         assert!(power_info(1, 8, 50, u32::MAX).charging);
         assert_eq!(step_level(0.98, 0.05), 1.0);
         assert_eq!(step_level(0.02, -0.05), 0.0);
+        assert_eq!(step_level(f32::NAN, 0.05), 0.5);
+        assert_eq!(step_level(0.4, f32::NAN), 0.4);
+        assert_eq!(step_level(0.4, f32::INFINITY), 0.4);
     }
 
     #[test]
