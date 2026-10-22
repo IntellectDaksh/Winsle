@@ -9,6 +9,7 @@ import { ICONS } from "../views/icons";
 import { Live, fmtBytes, fmtClock, fmtUntil, type CompactKind } from "./store";
 import { COMPACT_LIVE_W } from "../core/layout";
 import { lineAt } from "./lyrics";
+import { summarizeProgress } from "./progress-utils";
 
 interface Slot {
   kind: CompactKind;
@@ -160,12 +161,14 @@ function buildSlot(kind: CompactKind): Slot {
           const items = Live.activeDownloads();
           const first = items[0];
           if (!first) return;
+          const summary = summarizeProgress(first.bytes, first.totalBytes, first.speed, first.done);
           a.textContent = items.length > 1 ? `${first.name} +${items.length - 1}` : first.name;
-          b.textContent = `${fmtBytes(first.bytes)} · ${fmtBytes(first.speed)}/s`;
+          const etaPart = summary.etaFormatted ? ` · ${summary.etaFormatted}` : "";
+          b.textContent = `${fmtBytes(first.bytes)} · ${fmtBytes(first.speed)}/s${etaPart}`;
           const fill = bar.firstElementChild as HTMLElement;
-          if (first.totalBytes) {
+          if (summary.pct != null) {
             bar.classList.remove("indeterminate");
-            fill.style.width = `${Math.min(100, (first.bytes / first.totalBytes) * 100)}%`;
+            fill.style.width = `${summary.pct}%`;
           } else {
             bar.classList.add("indeterminate");
             fill.style.width = "";

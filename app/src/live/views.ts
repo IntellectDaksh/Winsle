@@ -16,6 +16,7 @@ import { Agent } from "./agent";
 import { Spotify, HEART, HEART_OUTLINE, type SpotifyTrack } from "./spotify";
 import { calendarRsvp } from "./calendar-actions";
 import { sanitizeColor } from "./color";
+import { summarizeProgress } from "./progress-utils";
 
 export function shell(...children: Node[]): { el: HTMLElement; body: HTMLElement } {
   const body = h("div", { class: "lv-body" }, ...children);
@@ -472,11 +473,13 @@ function buildFiles(): ViewHost {
         const r = rows.get(i.id);
         if (!r) continue;
         const kind = i.kind === "render" ? "Render" : "Download";
+        const summary = summarizeProgress(i.bytes, i.totalBytes, i.speed, i.done);
+        const etaPart = !i.done && summary.etaFormatted ? ` · ${summary.etaFormatted}` : "";
         r.meta.textContent = i.done
           ? `${kind} finished · ${fmtBytes(i.bytes)}`
-          : `${kind} · ${fmtBytes(i.bytes)}${i.totalBytes ? ` of ${fmtBytes(i.totalBytes)}` : ""} · ${fmtBytes(i.speed)}/s`;
-        r.bar.classList.toggle("indeterminate", !i.done && !i.totalBytes);
-        r.fill.style.width = i.done ? "100%" : i.totalBytes ? `${(i.bytes / i.totalBytes) * 100}%` : "";
+          : `${kind} · ${fmtBytes(i.bytes)}${i.totalBytes ? ` of ${fmtBytes(i.totalBytes)}` : ""} · ${fmtBytes(i.speed)}/s${etaPart}`;
+        r.bar.classList.toggle("indeterminate", !i.done && summary.pct == null);
+        r.fill.style.width = summary.pct != null ? `${summary.pct}%` : "";
       }
     },
   };
