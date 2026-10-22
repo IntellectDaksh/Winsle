@@ -63,6 +63,44 @@ impl Default for Settings {
     }
 }
 
+impl Settings {
+    /// Validates and clamps settings fields to safe operational boundaries.
+    pub fn sanitize(&mut self) {
+        if !self.sound_volume.is_finite() || self.sound_volume < 0.0 {
+            self.sound_volume = 0.12;
+        } else if self.sound_volume > 1.0 {
+            self.sound_volume = 1.0;
+        }
+
+        if !self.auto_close_interval.is_finite() || self.auto_close_interval < 1.0 {
+            self.auto_close_interval = 6.0;
+        } else if self.auto_close_interval > 60.0 {
+            self.auto_close_interval = 60.0;
+        }
+
+        if !self.absence_interval.is_finite() || self.absence_interval < 10.0 {
+            self.absence_interval = 180.0;
+        } else if self.absence_interval > 3600.0 {
+            self.absence_interval = 3600.0;
+        }
+
+        let scr = self.screen.trim().to_lowercase();
+        if scr != "primary" && scr != "cursor" {
+            self.screen = "primary".into();
+        } else {
+            self.screen = scr;
+        }
+
+        if self.model.trim().is_empty() {
+            self.model = default_model();
+        }
+
+        if self.home_widgets.is_empty() {
+            self.home_widgets = default_home_widgets();
+        }
+    }
+}
+
 /// %APPDATA%\Winsle
 pub fn config_dir() -> PathBuf {
     let base = std::env::var_os("APPDATA")
@@ -88,16 +126,20 @@ fn settings_path() -> PathBuf {
 }
 
 pub fn load() -> Settings {
-    match std::fs::read(settings_path()) {
+    let mut s: Settings = match std::fs::read(settings_path()) {
         Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_default(),
         Err(_) => Settings::default(),
-    }
+    };
+    s.sanitize();
+    s
 }
 
 pub fn save(settings: &Settings) -> std::io::Result<()> {
+    let mut s = settings.clone();
+    s.sanitize();
     let dir = config_dir();
     std::fs::create_dir_all(&dir)?;
-    let json = serde_json::to_vec_pretty(settings)
+    let json = serde_json::to_vec_pretty(&s)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
     std::fs::write(settings_path(), json)
 }
