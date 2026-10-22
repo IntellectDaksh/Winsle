@@ -95,17 +95,26 @@ pub fn file_reveal(path: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// "Code.EXE" → "code"; aggregation key, case-insensitive.
+/// "Code.EXE" or "C:\\bin\\Code.EXE" → "code"; aggregation key, case-insensitive.
 fn proc_key(exe: &str) -> String {
-    let l = exe.to_ascii_lowercase();
+    let base = Path::new(exe)
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or(exe);
+    let l = base.trim().to_ascii_lowercase();
     l.strip_suffix(".exe").unwrap_or(&l).to_string()
 }
 
 fn display_name(exe: &str) -> &str {
-    if exe.len() > 4 && exe[exe.len() - 4..].eq_ignore_ascii_case(".exe") {
-        &exe[..exe.len() - 4]
+    let trimmed = exe.trim();
+    let base = Path::new(trimmed)
+        .file_name()
+        .and_then(|f| f.to_str())
+        .unwrap_or(trimmed);
+    if base.len() > 4 && base[base.len() - 4..].eq_ignore_ascii_case(".exe") {
+        &base[..base.len() - 4]
     } else {
-        exe
+        base
     }
 }
 
@@ -311,7 +320,10 @@ mod tests {
     #[test]
     fn names() {
         assert_eq!(proc_key("Code.EXE"), "code");
+        assert_eq!(proc_key("C:\\Program Files\\VSCode\\Code.exe"), "code");
+        assert_eq!(proc_key("C:/tools/bin/cargo.exe"), "cargo");
         assert_eq!(display_name("Code.EXE"), "Code");
+        assert_eq!(display_name("C:\\Apps\\Discord.exe"), "Discord");
         assert_eq!(display_name("System"), "System");
         let rows = vec![
             ProcInfo { name: "a".into(), mb: 1.04, count: 1 },
