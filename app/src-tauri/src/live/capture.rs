@@ -131,12 +131,17 @@ pub struct TaskLine {
     pub done: bool,
 }
 
-/// "- [x] text  _(stamp)_" → (done, "text"); None for non-task lines.
+/// "- [x] text  _(stamp)_" or "* [ ] text" → (done, "text"); None for non-task lines.
 fn parse_task(raw: &str) -> Option<(bool, &str)> {
-    let l = raw.trim_end_matches([CR, NL]);
-    let (done, rest) = if let Some(r) = l.strip_prefix("- [ ] ") {
+    let trimmed_end = raw.trim_end_matches([CR, NL]);
+    let l = trimmed_end.trim_start();
+    let (done, rest) = if let Some(r) = l.strip_prefix("- [ ] ").or_else(|| l.strip_prefix("* [ ] ")) {
         (false, r)
-    } else if let Some(r) = l.strip_prefix("- [x] ").or_else(|| l.strip_prefix("- [X] ")) {
+    } else if let Some(r) = l.strip_prefix("- [x] ")
+        .or_else(|| l.strip_prefix("- [X] "))
+        .or_else(|| l.strip_prefix("* [x] "))
+        .or_else(|| l.strip_prefix("* [X] "))
+    {
         (true, r)
     } else {
         return None;
@@ -165,8 +170,13 @@ fn toggle_in(content: &str, line: usize, text: &str) -> Result<(String, bool), S
         Some((d, t)) if t == text => d,
         _ => return Err("inbox changed, reopen".into()),
     };
-    l.replace_range(3..4, if done { " " } else { "x" });
-    Ok((lines.concat(), !done))
+    if let Some(bracket) = l.find('[') {
+        if bracket + 2 < l.len() && l.as_bytes().get(bracket + 2) == Some(&b']') {
+            l.replace_range(bracket + 1..bracket + 2, if done { " " } else { "x" });
+            return Ok((lines.concat(), !done));
+        }
+    }
+    Err("invalid task checkbox syntax".into())
 }
 
 fn read_inbox(path: &std::path::Path) -> Result<String, String> {
@@ -226,6 +236,19 @@ mod tests {
         assert_eq!(back, f);
         assert!(toggle_in(f, 1, "zz").is_err());
         assert!(toggle_in(f, 99, "a").is_err());
+
+        // Asterisk bullets and indentation
+        let f2 = "* [ ] star item\r\n  - [ ] indented subtask\r\n";
+        let l2 = list_tasks(f2, 8);
+        assert_eq!(l2.len(), 2);
+        assert_eq!(l2[0].text, "star item");
+        assert_eq!(l2[1].text, "indented subtask");
+        let (out2, d_star) = toggle_in(f2, 0, "star item").unwrap();
+        assert!(d_star);
+        assert_eq!(out2, "* [x] star item\r\n  - [ ] indented subtask\r\n");
+        let (out3, d_sub) = toggle_in(f2, 1, "indented subtask").unwrap();
+        assert!(d_sub);
+        assert_eq!(out3, "* [ ] star item\r\n  - [x] indented subtask\r\n");
     }
 
     #[test]
