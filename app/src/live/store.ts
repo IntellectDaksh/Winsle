@@ -819,7 +819,8 @@ export const Live = new LiveStore();
 // ── Formatting ────────────────────────────────────────────────────────────────
 
 export function fmtClock(ms: number): string {
-  const total = Math.max(0, Math.round(ms / 1000));
+  if (!Number.isFinite(ms) || ms <= 0) return "0:00";
+  const total = Math.round(ms / 1000);
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
@@ -828,7 +829,8 @@ export function fmtClock(ms: number): string {
 }
 
 export function fmtBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
+  if (!Number.isFinite(n) || n <= 0) return "0 B";
+  if (n < 1024) return `${Math.round(n)} B`;
   const units = ["KB", "MB", "GB", "TB"];
   let v = n / 1024;
   let i = 0;
@@ -841,6 +843,7 @@ export function fmtBytes(n: number): string {
 
 /** "in 8 min", "in 1 h 5 min", "now", "started 3 min ago". */
 export function fmtUntil(startMs: number): string {
+  if (!Number.isFinite(startMs) || startMs <= 0) return "—";
   const diff = startMs - Date.now();
   const mins = Math.round(Math.abs(diff) / 60_000);
   if (mins === 0) return "now";
@@ -849,15 +852,17 @@ export function fmtUntil(startMs: number): string {
 }
 
 export function fmtTime(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "—";
   return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 export function fmtRate(bytesPerSec: number | null): string {
-  return bytesPerSec == null ? "—" : `${fmtBytes(Math.round(bytesPerSec))}/s`;
+  return bytesPerSec == null || !Number.isFinite(bytesPerSec) || bytesPerSec <= 0 ? "—" : `${fmtBytes(Math.round(bytesPerSec))}/s`;
 }
 
 /** "3 d 4 h", "5 h 12 min", "42 min". */
 export function fmtUptime(s: number): string {
+  if (!Number.isFinite(s) || s <= 0) return "0 min";
   const d = Math.floor(s / 86400);
   const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
@@ -868,6 +873,7 @@ export function fmtUptime(s: number): string {
 
 /** "just now", "5 min ago", "2 h ago", "Tue". */
 export function fmtAgo(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "just now";
   const mins = Math.round((Date.now() - ms) / 60_000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins} min ago`;
@@ -895,6 +901,7 @@ export function hsl(r: number, g: number, b: number): string {
 
 /** "3h 12m", "45m". */
 export function fmtHM(secs: number): string {
+  if (!Number.isFinite(secs) || secs <= 0) return "0m";
   const m = Math.round(secs / 60);
   return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`;
 }
