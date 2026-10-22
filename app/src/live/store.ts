@@ -372,15 +372,26 @@ class LiveStore {
     State.notify();
   }
 
+  isAppMuted(app: string): boolean {
+    const target = app.trim().toLowerCase();
+    return this.mutedApps.some((a) => a.trim().toLowerCase() === target);
+  }
+
   muteApp(app: string) {
-    if (!this.mutedApps.includes(app)) this.mutedApps = [...this.mutedApps, app];
-    this.notifs = this.notifs.filter((n) => n.app !== app);
+    const clean = app.trim();
+    if (!clean) return;
+    if (!this.isAppMuted(clean)) {
+      this.mutedApps = [...this.mutedApps, clean];
+    }
+    const target = clean.toLowerCase();
+    this.notifs = this.notifs.filter((n) => n.app.trim().toLowerCase() !== target);
     save("mutedApps", this.mutedApps);
     State.notify();
   }
 
   unmuteApp(app: string) {
-    this.mutedApps = this.mutedApps.filter((a) => a !== app);
+    const target = app.trim().toLowerCase();
+    this.mutedApps = this.mutedApps.filter((a) => a.trim().toLowerCase() !== target);
     save("mutedApps", this.mutedApps);
     State.notify();
   }
@@ -624,7 +635,7 @@ class LiveStore {
     });
 
     void onEvent<NotifInfo>("live-notif", (n) => {
-      if (State.paused || this.mutedApps.includes(n.app)) return;
+      if (State.paused || this.isAppMuted(n.app)) return;
       // The same toast again (PowerToys, OEM tools…): bump the old one, stay quiet.
       const same = this.notifs.find((x) => x.app === n.app && x.title === n.title && x.body === n.body);
       if (same) {
