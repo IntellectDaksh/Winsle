@@ -143,3 +143,65 @@ pub fn save(settings: &Settings) -> std::io::Result<()> {
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
     std::fs::write(settings_path(), json)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_settings() {
+        let s = Settings::default();
+        assert_eq!(s.sound_volume, 0.12);
+        assert_eq!(s.auto_close_interval, 6.0);
+        assert_eq!(s.absence_interval, 180.0);
+        assert_eq!(s.screen, "primary");
+        assert!(!s.home_widgets.is_empty());
+    }
+
+    #[test]
+    fn test_sanitize_clamps_values() {
+        let mut s = Settings {
+            sound_volume: 5.0,
+            auto_close_interval: 0.1,
+            absence_interval: -10.0,
+            screen: "invalid_screen".into(),
+            model: "".into(),
+            home_widgets: Vec::new(),
+            ..Settings::default()
+        };
+
+        s.sanitize();
+
+        assert_eq!(s.sound_volume, 1.0);
+        assert_eq!(s.auto_close_interval, 6.0);
+        assert_eq!(s.absence_interval, 180.0);
+        assert_eq!(s.screen, "primary");
+        assert_eq!(s.model, default_model());
+        assert_eq!(s.home_widgets, default_home_widgets());
+    }
+
+    #[test]
+    fn test_sanitize_guards_nan() {
+        let mut s = Settings {
+            sound_volume: f64::NAN,
+            auto_close_interval: f64::NAN,
+            absence_interval: f64::INFINITY,
+            screen: "CURSOR".into(),
+            ..Settings::default()
+        };
+
+        s.sanitize();
+
+        assert_eq!(s.sound_volume, 0.12);
+        assert_eq!(s.auto_close_interval, 6.0);
+        assert_eq!(s.absence_interval, 180.0);
+        assert_eq!(s.screen, "cursor");
+
+        let mut large = Settings {
+            absence_interval: 10_000.0,
+            ..Settings::default()
+        };
+        large.sanitize();
+        assert_eq!(large.absence_interval, 3600.0);
+    }
+}
