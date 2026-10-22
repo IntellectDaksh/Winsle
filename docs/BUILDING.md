@@ -40,9 +40,16 @@ Some tests read real system values; they are marked `#[ignore]` and can be run w
 ### Frontend & Live Modules (Node.js)
 ```bash
 cd app
-npm test             # runs all unit tests
-npm run test:calc    # palette math and unit converter tests
-npm run test:lyrics  # LRC parser and binary search lookup tests
+npm test                 # runs all 9 unit test suites (~120ms total)
+npm run test:calc        # palette math, units, and recursion DoS protection tests
+npm run test:lyrics      # LRC parser and binary search lookup tests
+npm run test:security    # secret/key leak detector and masking tests
+npm run test:hooks       # Antigravity hook bridge event translator tests
+npm run test:formatters  # time, clock, and byte formatter tests
+npm run test:color       # CSS color injection sanitization and contrast tests
+npm run test:tasks       # markdown task checkbox parser and formatter tests
+npm run test:net         # network latency and SSID sanitization tests
+npm run test:power       # battery percent normalization and power status tests
 ```
 
 ## Front-end only

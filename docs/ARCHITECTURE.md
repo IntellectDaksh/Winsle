@@ -59,3 +59,13 @@ Views are built once and only re-render when their data key changes. A single on
 - When the capsule goes quiet, the webview is asked to use its low memory target; it returns to normal on the next interaction.
 - The settings window is created hidden at launch and kept at the low memory target while hidden.
 - Expensive reads (process list) only run while the view that shows them is open.
+
+## Security Model & Input Validation
+
+- **URL Protocol Protection:** `open_url` enforces strict HTTP/HTTPS validation via `is_safe_web_url`, rejecting shell command characters, quotes, whitespace, and non-web URI schemes to prevent argument injection into `rundll32`.
+- **Path Canonicalization & Blocked Binaries:** File launch commands (`file_open`) trim trailing dots, spaces, and NTFS Alternate Data Streams (`:`) before evaluating against an expanded list of blocked executable extensions (`.exe`, `.msi`, `.bat`, `.cmd`, `.ps1`, `.pif`, `.cpl`, `.msc`, `.jar`, `.iso`, etc.).
+- **Windows Device Name Sanitization:** Dropped files (`ingest`) reject/prefix Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`) and sanitize illegal characters to prevent filesystem corruption.
+- **Credential Leak Prevention:** Both backend (`extras.rs`) and frontend (`security.ts` & `store.ts`) inspect clipboard updates against API key prefixes (OpenAI, Anthropic, GitHub PAT, GitLab, Slack, AWS, Google), PEM private keys, and high-entropy hashes to prevent saving secrets to `localStorage` or displaying them in screen flashes.
+- **Calculator Stack Overflow Guard:** The recursive-descent parser (`calc.ts`) limits input string lengths and enforces a hard recursion depth limit (`MAX_DEPTH = 32`) to prevent call-stack exhaustion DoS.
+- **Hook Event Allowlist:** `antigravity-bridge.mjs` validates incoming events against a strict set of allowed lifecycle events before spawning helper processes.
+
