@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { IS_TAURI } from "../core/bridge";
 import { h, clear } from "../views/dom";
 import type { AgentReply } from "./agent";
+import { isQuickEventRequest } from "./calendar-utils";
 
 export type CalendarProvider = "google" | "microsoft";
 
@@ -31,7 +32,7 @@ export function calendarRsvp(id: string, accept: boolean): Promise<void> {
 
 /** "event tomorrow 3pm Call with X" → creates it on the connected account; null when the text isn't an event request. */
 export async function quickEvent(text: string): Promise<AgentReply | null> {
-  if (!/^(?:(?:new|add|create)\s+)?(?:event|meeting)\s+\S/i.test(text) || !IS_TAURI) return null;
+  if (!isQuickEventRequest(text) || !IS_TAURI) return null;
   try {
     const c = await invoke<Created>("calendar_quick_create", { text, tzOffsetMin: -new Date().getTimezoneOffset() });
     const when = new Date(c.start).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
