@@ -3,18 +3,19 @@
 // they are served at /sounds/<name>.wav. Default volume 0.12, slider range 0–0.2,
 // exactly like the Mac player, and several sounds may overlap.
 
-export const SOUND_NAMES = [
-  "peek", "open", "close", "hover", "blip", "slap", "annoyed", "dizzy", "greet",
-  "work", "finish", "error", "approval", "question", "approve", "gulp", "tick",
-  "send", "love", "pop", "proud", "wink", "yawn", "attach", "think", "search",
-  "rate", "sleep",
-] as const;
+import {
+  SOUND_NAMES,
+  type SoundName,
+  DEFAULT_SOUND_VOLUME,
+  clampSoundVolume,
+  isValidSoundName,
+} from "./sound-utils";
 
-export type SoundName = (typeof SOUND_NAMES)[number];
+export { SOUND_NAMES, type SoundName, clampSoundVolume, isValidSoundName };
 
 class SoundEngine {
   enabled = true;
-  volume = 0.12;
+  volume = DEFAULT_SOUND_VOLUME;
 
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -76,7 +77,7 @@ class SoundEngine {
   }
 
   setVolume(v: number) {
-    this.volume = Math.max(0, Math.min(0.2, v));
+    this.volume = clampSoundVolume(v);
     if (this.master) this.master.gain.value = this.volume;
   }
 
@@ -102,15 +103,19 @@ class SoundEngine {
     const master = this.master;
     const buf = this.buffers.get(name);
     if (!ctx || !master || !buf) return;
-    if (this.idleTimer != null) {
-      window.clearTimeout(this.idleTimer);
-      this.idleTimer = null;
+    try {
+      if (this.idleTimer != null) {
+        window.clearTimeout(this.idleTimer);
+        this.idleTimer = null;
+      }
+      if (ctx.state === "suspended") void ctx.resume();
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(master);
+      src.start();
+    } catch {
+      /* AudioContext state transition or buffer decode issues must never crash */
     }
-    if (ctx.state === "suspended") void ctx.resume();
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(master);
-    src.start();
   }
 }
 
