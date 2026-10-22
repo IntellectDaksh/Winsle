@@ -9,7 +9,7 @@ import { State } from "../core/state";
 import { load, prefs, save, today } from "./prefs";
 import { trackChanged } from "./lyrics";
 import { isSecretText } from "./security";
-import { hsl, isNoise, appColor } from "./formatters";
+import { hsl, isNoise, appColor, sanitizeNotificationText } from "./formatters";
 import type { AppUsage, ColorInfo, TaskLine } from "./types";
 import type {
   CalendarEvent, CalendarInfo, ClipInfo, MediaInfo, NetInfo, PowerInfo, VolumeInfo, NotifInfo, PrivacyInfo, ProgressItem, ProgressInfo, SysInfo,
@@ -639,6 +639,8 @@ class LiveStore {
 
     void onEvent<NotifInfo>("live-notif", (n) => {
       if (State.paused || this.isAppMuted(n.app)) return;
+      n.title = sanitizeNotificationText(n.title, 120);
+      n.body = sanitizeNotificationText(n.body, 300);
       // The same toast again (PowerToys, OEM tools…): bump the old one, stay quiet.
       const same = this.notifs.find((x) => x.app === n.app && x.title === n.title && x.body === n.body);
       if (same) {

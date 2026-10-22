@@ -1,5 +1,4 @@
 // Pure presentation and formatting helpers for time, clock, bytes, and colors.
-import type { NotifInfo } from "./types";
 
 export function fmtClock(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return "0:00";
@@ -89,24 +88,10 @@ export function fmtHM(secs: number): string {
   return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`;
 }
 
-/** Toasts that are almost never worth an interruption. */
-const NOISE_APPS = /^(ASUS|MyASUS|Armoury Crate|GlideX|Windows|NVIDIA|Creative Cloud|Acrobat)$/i;
-const NOISE_TEXT = /administrator privileges|update (is )?available|survey|tips? (for|and)|get the most out of/i;
-
-export function isNoise(n: NotifInfo): boolean {
-  return NOISE_APPS.test(n.app) || NOISE_TEXT.test(`${n.title} ${n.body}`) || /^PowerToys$/.test(n.app);
-}
-
-/** Stable accent per app name (notification avatars). */
-export function appColor(app: string): string {
-  const known: Record<string, string> = {
-    WhatsApp: "#25D366", Discord: "#5865F2", Slack: "#E01E5A", Teams: "#6264A7", Outlook: "#0F6CBD",
-    Chrome: "#4285F4", Edge: "#0EA5E9", Spotify: "#1DB954", Telegram: "#2AABEE", Gmail: "#EA4335",
-    "VS Code": "#3B9EFF", Antigravity: "#A78BFA",
-  };
-  if (known[app]) return known[app];
-  const palette = ["#60A5FA", "#F472B6", "#FBBF24", "#34D399", "#A78BFA", "#F87171", "#22D3EE"];
-  let h = 0;
-  for (let i = 0; i < app.length; i++) h = (h * 31 + app.charCodeAt(i)) | 0;
-  return palette[Math.abs(h) % palette.length];
-}
+export {
+  NOISE_APPS,
+  NOISE_TEXT,
+  isNoise,
+  sanitizeNotificationText,
+  appColor,
+} from "./notif-utils";
