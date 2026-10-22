@@ -1,6 +1,6 @@
 // Helper functions for calendar event intent matching and title cleaning.
 
-const QUICK_EVENT_RE = /^(?:(?:new|add|create)\s+)?(?:event|meeting)\s+(\S.*)$/i;
+const QUICK_EVENT_RE = /^(?:(?:new|add|create)\s+)?(?:event|meeting)\s+(?!(?:notes|summary|minutes|recap|loop)\b)(\S.*)$/i;
 
 /**
  * Returns true if text matches a natural language calendar quick-event creation request.
