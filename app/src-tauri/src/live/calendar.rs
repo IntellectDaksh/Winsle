@@ -506,12 +506,13 @@ pub(super) fn join_url(fields: &[&str]) -> Option<String> {
             let token = token.trim_end_matches(['.', ';', ':']);
             let Some((_, rest)) = token.split_once("://") else { continue };
             let (host, path) = rest.split_at(rest.find('/').unwrap_or(rest.len()));
-            let host = host.to_ascii_lowercase();
+            let is_http = token.starts_with("https://") || token.starts_with("http://");
             let ok = (host == "meet.google.com" && path.len() > 1)
                 || ((host == "zoom.us" || host.ends_with(".zoom.us")) && path.starts_with("/j/"))
                 || (host == "teams.microsoft.com" && path.starts_with("/l/meetup-join/"))
-                || (host == "teams.live.com" && path.starts_with("/meet/"));
-            if ok && token.to_ascii_lowercase().starts_with("http") {
+                || (host == "teams.live.com" && path.starts_with("/meet/"))
+                || (host.ends_with(".webex.com") && (path.starts_with("/meet/") || path.starts_with("/join/")));
+            if ok && is_http && !token.chars().any(|c| c.is_control() || c == '"' || c == '\'' || c == ';' || c == '\\') {
                 return Some(token.to_string());
             }
         }
@@ -560,6 +561,11 @@ mod tests {
             Some("https://teams.microsoft.com/l/meetup-join/19%3ameeting_x/0?context=y".into())
         );
         assert_eq!(join_url(&["https://zoom.us/pricing", "https://meet.google.com/", ""]), None);
+        assert_eq!(
+            join_url(&["https://company.webex.com/meet/user123"]),
+            Some("https://company.webex.com/meet/user123".into())
+        );
+        assert_eq!(join_url(&["https://meet.google.com/abc;calc.exe"]), None);
     }
 
     const ICS: &str = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:a\r\nDTSTART:20261001T093000Z\r\nDTEND:20261001T100000Z\r\nSUMMARY:Standup\\, daily\r\nDESCRIPTION:Join https://meet.google.com/\r\n abc-defg-hij now\r\nBEGIN:VALARM\r\nDESCRIPTION:ignored\r\nEND:VALARM\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:b\r\nDTSTART;TZID=Asia/Kolkata:20261001T150000\r\nDTEND;TZID=Asia/Kolkata:20261001T160000\r\nSUMMARY:Client call\r\nLOCATION:Office\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:c\r\nDTSTART;VALUE=DATE:20261001\r\nSUMMARY:Holiday\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:d\r\nDTSTART:20261001T120000Z\r\nSTATUS:CANCELLED\r\nSUMMARY:Gone\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:w\r\nDTSTART;TZID=Asia/Kolkata:20260907T180000\r\nDURATION:PT30M\r\nRRULE:FREQ=WEEKLY;BYDAY=MO,TH;UNTIL=20261231T000000Z\r\nEXDATE;TZID=Asia/Kolkata:20260910T180000\r\nSUMMARY:Gym\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:old\r\nDTSTART:20200101T000000Z\r\nSUMMARY:Past\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
