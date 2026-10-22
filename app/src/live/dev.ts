@@ -67,53 +67,29 @@ const HISTORY = 12;
 /** Re-chime a permission request nobody has answered after this long. */
 const APPROVAL_NAG_MS = 60_000;
 
-const VERBS: Record<string, string> = {
-  Bash: "Run", PowerShell: "Run", run_command: "Run",
-  Read: "Read", view_file: "Read",
-  Write: "Write", write_to_file: "Write",
-  Edit: "Edit", MultiEdit: "Edit", replace_file_content: "Edit", NotebookEdit: "Notebook",
-  Glob: "Find", Grep: "Search", LS: "List",
-  WebSearch: "Web search", WebFetch: "Fetch",
-  TodoWrite: "Plan", Task: "Agent", Agent: "Agent",
+import {
+  VERBS,
+  WRITES,
+  RUNS,
+  baseName,
+  describeTool,
+  contextWindow,
+  calcContextPct,
+  fmtDuration,
+  fmtTokens,
+} from "./dev-utils";
+
+export {
+  VERBS,
+  WRITES,
+  RUNS,
+  baseName,
+  describeTool,
+  contextWindow,
+  calcContextPct,
+  fmtDuration,
+  fmtTokens,
 };
-const WRITES = new Set(["Write", "Edit", "MultiEdit", "NotebookEdit", "write_to_file", "replace_file_content"]);
-const RUNS = new Set(["Bash", "PowerShell", "run_command"]);
-
-function baseName(p: string): string {
-  const s = p.replace(/[\\/]+$/, "");
-  return s.slice(Math.max(s.lastIndexOf("\\"), s.lastIndexOf("/")) + 1);
-}
-
-function describe(tool: string, input: Record<string, unknown>): { label: string; detail: string; file: string | null } {
-  const str = (k: string) => (typeof input[k] === "string" ? (input[k] as string).trim() : "");
-  const verb = VERBS[tool] ?? tool;
-  const file = str("file_path") || str("path") || str("notebook_path");
-  if (str("command")) return { label: verb, detail: str("command"), file: null };
-  if (file) return { label: verb, detail: baseName(file), file };
-  for (const k of ["pattern", "query", "url", "description", "prompt"]) {
-    if (str(k)) return { label: verb, detail: str(k), file: null };
-  }
-  if (tool === "TodoWrite" && Array.isArray(input.todos)) return { label: verb, detail: `${input.todos.length} items`, file: null };
-  return { label: verb, detail: "", file: null };
-}
-
-/** Context window for a model id; 1M variants say so in the id. */
-export function contextWindow(model: string | null | undefined, used = 0): number {
-  // Past 200k the session can only be on a 1M window, whatever the id says.
-  return (model && /1m|\[1m\]/i.test(model)) || used > 200_000 ? 1_000_000 : 200_000;
-}
-
-export function fmtDuration(ms: number): string {
-  const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${String(s % 60).padStart(2, "0")}s`;
-  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
-}
-
-export function fmtTokens(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}k` : String(n);
-}
 
 class DevTracker {
   session: DevSession | null = null;
@@ -139,8 +115,8 @@ class DevTracker {
 
   contextPct(): number | null {
     const st = this.session?.stats;
-    if (!st || !st.contextTokens) return null;
-    return Math.min(100, (st.contextTokens / contextWindow(st.model, st.contextTokens)) * 100);
+    if (!st) return null;
+    return calcContextPct(st.contextTokens, st.model);
   }
 
   /** Recent project folders, newest first (palette: "open project"). */
@@ -231,7 +207,7 @@ class DevTracker {
         if (s.status === "done" || s.status === "error" || s.status === "idle") this.newTurn(s, s.prompt);
         const tool = p.tool_name ?? "Tool";
         const input = p.tool_input ?? {};
-        const d = describe(tool, input);
+        const d = describeTool(tool, input);
         s.steps.push({ at: Date.now(), tool, label: d.label, detail: d.detail, failed: false });
         if (s.steps.length > MAX_STEPS) s.steps.shift();
         if (d.file && WRITES.has(tool)) s.files.add(d.file.toLowerCase());
