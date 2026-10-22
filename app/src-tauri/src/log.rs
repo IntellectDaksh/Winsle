@@ -7,6 +7,21 @@ use windows::Win32::System::SystemInformation::GetLocalTime;
 
 use crate::settings;
 
+pub const MAX_LOG_BYTES: u64 = 1_000_000;
+
+/// Rotates log file to `<file>.1` when its size exceeds max_bytes to preserve recent logs.
+pub fn rotate_if_needed(path: &std::path::Path, max_bytes: u64) -> std::io::Result<bool> {
+    if let Ok(m) = std::fs::metadata(path) {
+        if m.len() >= max_bytes {
+            let backup = path.with_extension("log.1");
+            let _ = std::fs::remove_file(&backup);
+            let _ = std::fs::rename(path, &backup);
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 pub fn line(message: impl AsRef<str>) {
     let t = unsafe { GetLocalTime() };
     let stamp = format!(
@@ -18,10 +33,7 @@ pub fn line(message: impl AsRef<str>) {
         return;
     }
     let path = dir.join("winsle.log");
-    // Keep it from growing forever: start fresh past ~1 MB.
-    if std::fs::metadata(&path).map(|m| m.len() > 1_000_000).unwrap_or(false) {
-        let _ = std::fs::remove_file(&path);
-    }
+    let _ = rotate_if_needed(&path, MAX_LOG_BYTES);
     if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
         let _ = writeln!(file, "{stamp} {}", message.as_ref());
     }
