@@ -5,6 +5,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { IS_TAURI, onEvent } from "../core/bridge";
 import { h } from "../views/dom";
+import { cleanVoiceTranscription } from "./voice-utils";
 
 interface VoiceStatus {
   enabled: boolean;
@@ -55,9 +56,11 @@ export async function registerVoice() {
       case "error":
         Live.setFlash({ icon: "bang", color: "#F87171", title: "Voice", sub: s.error ?? "Something went wrong", view: "agent" }, 4000);
         break;
-      case "done":
-        void run(s.text);
+      case "done": {
+        const cleaned = cleanVoiceTranscription(s.text);
+        if (cleaned) void run(cleaned);
         break;
+      }
     }
   });
 }
