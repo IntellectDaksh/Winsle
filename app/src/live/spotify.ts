@@ -19,8 +19,21 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
   }
 }
 
-export const HEART = "M12 20.5 10.6 19.2C5.4 14.5 2 11.4 2 7.6 2 4.5 4.4 2 7.5 2c1.7 0 3.4.8 4.5 2.1C13.1 2.8 14.8 2 16.5 2 19.6 2 22 4.5 22 7.6c0 3.8-3.4 6.9-8.6 11.6L12 20.5z";
-export const HEART_OUTLINE = "M16.5 2c-1.7 0-3.4.8-4.5 2.1C10.9 2.8 9.2 2 7.5 2 4.4 2 2 4.5 2 7.6c0 3.8 3.4 6.9 8.6 11.6L12 20.5l1.4-1.3C18.6 14.5 22 11.4 22 7.6 22 4.5 19.6 2 16.5 2zm-4.4 15.7-.1.1-.1-.1C7.1 13.4 4 10.6 4 7.6 4 5.6 5.5 4 7.5 4c1.5 0 3 1 3.6 2.4h1.9C13.5 5 15 4 16.5 4c2 0 3.5 1.6 3.5 3.6 0 3-3.1 5.8-7.9 10.1z";
+import {
+  HEART,
+  HEART_OUTLINE,
+  parseSpotifyCommand,
+  sanitizeTrackMetadata,
+  formatTrackProgress,
+} from "./spotify-utils";
+
+export {
+  HEART,
+  HEART_OUTLINE,
+  parseSpotifyCommand,
+  sanitizeTrackMetadata,
+  formatTrackProgress,
+};
 
 let connected: boolean | null = null;
 let current: { key: string; track: SpotifyTrack | null } | null = null;
@@ -56,18 +69,20 @@ export const Spotify = {
 
   /** "play <q>", "queue <q>", "playlists", "playlist <name>"; null if not a Spotify command or not linked. */
   async command(text: string): Promise<string | null> {
-    const m = /^(play|queue|playlist)\s+(.+)$/i.exec(text.trim()) ?? /^(playlists)$/i.exec(text.trim());
-    if (!m || /^(play)\s+(music|the music|song)$/i.test(text.trim()) || !(await this.isConnected())) return null;
-    const verb = m[1].toLowerCase();
-    if (verb === "play") return `Playing ${await this.play(m[2])}.`;
-    if (verb === "queue") return `Queued ${await this.queue(m[2])}.`;
+    const cmd = parseSpotifyCommand(text);
+    if (!cmd || !(await this.isConnected())) return null;
+    if (cmd.action === "play" && cmd.target) return `Playing ${await this.play(cmd.target)}.`;
+    if (cmd.action === "queue" && cmd.target) return `Queued ${await this.queue(cmd.target)}.`;
     const lists = await this.playlists();
-    if (verb === "playlists") return lists.length ? lists.slice(0, 12).map((p) => p.name).join(" · ") : "No playlists on this account.";
-    const want = m[2].toLowerCase();
-    const hit = lists.find((p) => p.name.toLowerCase() === want) ?? lists.find((p) => p.name.toLowerCase().includes(want));
-    if (!hit) return `No playlist called "${m[2]}".`;
-    await this.playPlaylist(hit.uri);
-    return `Playing ${hit.name}.`;
+    if (cmd.action === "playlists") return lists.length ? lists.slice(0, 12).map((p) => p.name).join(" · ") : "No playlists on this account.";
+    if (cmd.action === "playlist" && cmd.target) {
+      const want = cmd.target.toLowerCase();
+      const hit = lists.find((p) => p.name.toLowerCase() === want) ?? lists.find((p) => p.name.toLowerCase().includes(want));
+      if (!hit) return `No playlist called "${cmd.target}".`;
+      await this.playPlaylist(hit.uri);
+      return `Playing ${hit.name}.`;
+    }
+    return null;
   },
 };
 
