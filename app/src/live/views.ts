@@ -15,6 +15,7 @@ import { buildAgentViews } from "./views3";
 import { Agent } from "./agent";
 import { Spotify, HEART, HEART_OUTLINE, type SpotifyTrack } from "./spotify";
 import { calendarRsvp } from "./calendar-actions";
+import { sanitizeColor } from "./color";
 
 export function shell(...children: Node[]): { el: HTMLElement; body: HTMLElement } {
   const body = h("div", { class: "lv-body" }, ...children);
@@ -682,7 +683,7 @@ function buildClips(): ViewHost {
       if (ck !== colorKey) {
         colorKey = ck;
         swatches.replaceChildren(...Live.colors.map((c) => h("button", {
-          class: "lv-swatch", style: `background:${c.hex}`, title: `${c.hex} — click to copy, right-click to remove`,
+          class: "lv-swatch", style: `background:${sanitizeColor(c.hex)}`, title: `${c.hex} — click to copy, right-click to remove`,
           onclick: () => void Live.copyClip(c.hex),
           oncontextmenu: (e: Event) => { e.preventDefault(); Live.removeColor(c.hex); },
         })), ...(Live.colors.length ? [h("span", { class: "lv-meta", text: "Ctrl+Alt+C picks a colour" })] : []));
