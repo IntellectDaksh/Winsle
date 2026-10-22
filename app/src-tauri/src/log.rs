@@ -38,3 +38,39 @@ pub fn line(message: impl AsRef<str>) {
         let _ = writeln!(file, "{stamp} {}", message.as_ref());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rotate_if_needed_when_under_threshold() {
+        let temp = std::env::temp_dir().join(format!("winsle_log_test_under_{}.log", std::process::id()));
+        let _ = std::fs::remove_file(&temp);
+        std::fs::write(&temp, b"short log entry").unwrap();
+
+        let rotated = rotate_if_needed(&temp, 1000).unwrap();
+        assert!(!rotated);
+        assert!(temp.exists());
+
+        let _ = std::fs::remove_file(&temp);
+    }
+
+    #[test]
+    fn test_rotate_if_needed_when_over_threshold() {
+        let temp = std::env::temp_dir().join(format!("winsle_log_test_over_{}.log", std::process::id()));
+        let backup = temp.with_extension("log.1");
+        let _ = std::fs::remove_file(&temp);
+        let _ = std::fs::remove_file(&backup);
+
+        std::fs::write(&temp, vec![b'a'; 150]).unwrap();
+
+        let rotated = rotate_if_needed(&temp, 100).unwrap();
+        assert!(rotated);
+        assert!(!temp.exists());
+        assert!(backup.exists());
+        assert_eq!(std::fs::metadata(&backup).unwrap().len(), 150);
+
+        let _ = std::fs::remove_file(&backup);
+    }
+}
