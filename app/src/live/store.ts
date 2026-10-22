@@ -70,6 +70,7 @@ export interface FocusStats {
 }
 
 const CLIP_LIMIT = 25;
+export const CLIP_MAX_CHARS = 10_000;
 const HISTORY_LEN = 60;
 /** Input gap that counts as having taken a break. */
 const BREAK_RESET_S = 5 * 60;
@@ -400,12 +401,14 @@ class LiveStore {
 
   private addClip(text: string) {
     if (!prefs().clipHistory) return;
-    if (isSecretText(text)) return;
-    const old = this.clips.find((c) => c.text === text);
-    const rest = this.clips.filter((c) => c.text !== text);
+    const clean = text.trim();
+    if (!clean || isSecretText(clean)) return;
+    const truncated = clean.length > CLIP_MAX_CHARS ? clean.slice(0, CLIP_MAX_CHARS) : clean;
+    const old = this.clips.find((c) => c.text === truncated);
+    const rest = this.clips.filter((c) => c.text !== truncated);
     const pinned = rest.filter((c) => c.pinned);
     const loose = rest.filter((c) => !c.pinned).slice(0, Math.max(0, CLIP_LIMIT - pinned.length - 1));
-    const entry = { text, pinned: old?.pinned ?? false, time: Date.now() };
+    const entry = { text: truncated, pinned: old?.pinned ?? false, time: Date.now() };
     this.clips = entry.pinned ? [entry, ...pinned, ...loose] : [...pinned, entry, ...loose];
     save("clips", this.clips);
   }
