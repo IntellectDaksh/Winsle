@@ -57,6 +57,16 @@ pub fn clean_site_keyword(s: &str) -> &str {
     s.trim_end_matches('/')
 }
 
+/// Returns both the full domain/path ("youtube.com") and its stem ("youtube") for flexible title matching.
+pub fn site_keyword_stems(s: &str) -> (&str, &str) {
+    let raw = clean_site_keyword(s);
+    let stem = match raw.rfind('.') {
+        Some(i) if i > 0 => &raw[..i],
+        _ => raw,
+    };
+    (raw, stem)
+}
+
 pub fn is_browser(exe: &str) -> bool {
     let norm = norm_exe(exe);
     BROWSERS.contains(&norm.as_str())
@@ -77,11 +87,15 @@ pub fn matches(apps: &[String], sites: &[String], exe: &str, title: &str) -> Opt
         .iter()
         .map(|s| s.trim())
         .find(|s| {
-            let kw = clean_site_keyword(s).to_lowercase();
-            !kw.is_empty() && title.contains(&kw)
+            let (raw, stem) = site_keyword_stems(s);
+            let raw_lower = raw.to_lowercase();
+            let stem_lower = stem.to_lowercase();
+            (!raw_lower.is_empty() && title.contains(&raw_lower))
+                || (!stem_lower.is_empty() && title.contains(&stem_lower))
         })
         .map(str::to_string)
 }
+
 
 
 fn allowed(allow_until: Option<Instant>, now: Instant) -> bool {
@@ -225,4 +239,27 @@ mod tests {
         assert!(!allowed(Some(now + Duration::from_secs(300)), now + Duration::from_secs(300)));
         assert!(!allowed(Some(now), now + Duration::from_secs(1)));
     }
+
+    #[test]
+    fn test_norm_exe_and_keywords() {
+        assert_eq!(norm_exe("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"), "chrome");
+        assert_eq!(norm_exe("C:\\Users\\User\\AppData\\Local\\Programs\\Zen\\zen.exe"), "zen");
+        assert_eq!(norm_exe("DISCORD.EXE"), "discord");
+
+        assert_eq!(clean_site_keyword("https://www.youtube.com/"), "youtube.com");
+        assert_eq!(clean_site_keyword("http://reddit.com/r/popular/"), "reddit.com/r/popular");
+        assert_eq!(clean_site_keyword("twitter.com"), "twitter.com");
+
+        assert!(is_browser("chrome"));
+        assert!(is_browser("msedge.exe"));
+        assert!(is_browser("C:\\browsers\\brave.exe"));
+        assert!(!is_browser("notepad.exe"));
+
+        let sites = v(&["https://www.youtube.com/", "twitter.com"]);
+        assert_eq!(
+            matches(&[], &sites, "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", "YouTube - Home - Google Chrome").as_deref(),
+            Some("https://www.youtube.com/")
+        );
+    }
 }
+
