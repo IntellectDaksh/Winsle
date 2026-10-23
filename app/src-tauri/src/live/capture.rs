@@ -82,14 +82,37 @@ fn default_dir() -> Option<PathBuf> {
         .map(|d| d.join("Winsle"))
 }
 
+/// Replaces ASCII/Unicode control characters (newlines, tabs, escape codes) with spaces so tasks stay single-line.
+pub fn sanitize_task_text(text: &str) -> String {
+    text.chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect()
+}
+
 /// One Markdown task line; newlines collapse so the item stays one checkbox.
 fn task_line(text: &str, stamp: &str) -> Result<String, String> {
-    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let sanitized = sanitize_task_text(text);
+    let text = sanitized.split_whitespace().collect::<Vec<_>>().join(" ");
     if text.is_empty() {
         return Err("nothing to save".into());
     }
     let text: String = text.chars().take(MAX_CHARS).collect();
     Ok(format!("- [ ] {text}  _({stamp})_\n"))
+}
+
+/// Resolves target inbox.md path from configured folder or default Documents/Winsle folder,
+/// verifying against control characters and null bytes.
+pub fn resolve_inbox_path(configured: &str, default: Option<PathBuf>) -> Result<PathBuf, String> {
+    let trimmed = configured.trim();
+    if trimmed.is_empty() {
+        let base = default.ok_or_else(|| "no Documents folder".to_string())?;
+        return Ok(base.join("inbox.md"));
+    }
+    if trimmed.chars().any(|c| c == '\0' || (c.is_control() && c != '\t')) {
+        return Err("invalid characters in capture directory".to_string());
+    }
+    let dir = PathBuf::from(trimmed);
+    Ok(dir.join("inbox.md"))
 }
 
 pub(crate) fn inbox_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -99,13 +122,9 @@ pub(crate) fn inbox_path(app: &AppHandle) -> Result<PathBuf, String> {
         .lock()
         .map(|s| s.capture_dir.trim().to_string())
         .unwrap_or_default();
-    let dir = if configured.is_empty() {
-        default_dir().ok_or("no Documents folder")?
-    } else {
-        PathBuf::from(configured)
-    };
-    Ok(dir.join("inbox.md"))
+    resolve_inbox_path(&configured, default_dir())
 }
+
 
 #[tauri::command]
 pub fn capture_save(app: AppHandle, text: String) -> Result<String, String> {
