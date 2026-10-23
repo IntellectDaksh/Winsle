@@ -39,24 +39,50 @@ struct Blocked {
     name: String,
 }
 
-fn norm_exe(s: &str) -> String {
-    let s = s.trim().to_lowercase();
-    s.strip_suffix(".exe").map(str::to_string).unwrap_or(s)
+pub fn norm_exe(s: &str) -> String {
+    let stem = std::path::Path::new(s)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(s);
+    let trimmed = stem.trim().to_lowercase();
+    trimmed.strip_suffix(".exe").map(str::to_string).unwrap_or(trimmed)
+}
+
+/// Strips protocols, www prefixes, and trailing slashes so site keywords match browser titles cleanly.
+pub fn clean_site_keyword(s: &str) -> &str {
+    let s = s.trim();
+    let s = s.strip_prefix("https://").unwrap_or(s);
+    let s = s.strip_prefix("http://").unwrap_or(s);
+    let s = s.strip_prefix("www.").unwrap_or(s);
+    s.trim_end_matches('/')
+}
+
+pub fn is_browser(exe: &str) -> bool {
+    let norm = norm_exe(exe);
+    BROWSERS.contains(&norm.as_str())
 }
 
 /// Which block-list entry the foreground window hits, if any. `exe` is the
 /// image stem ("chrome"); site keywords only apply to browser windows.
-fn matches(apps: &[String], sites: &[String], exe: &str, title: &str) -> Option<String> {
+pub fn matches(apps: &[String], sites: &[String], exe: &str, title: &str) -> Option<String> {
     let exe = norm_exe(exe);
     if let Some(a) = apps.iter().find(|a| !a.trim().is_empty() && norm_exe(a) == exe) {
         return Some(a.trim().to_string());
     }
-    if !BROWSERS.contains(&exe.as_str()) {
+    if !is_browser(&exe) {
         return None;
     }
     let title = title.to_lowercase();
-    sites.iter().map(|s| s.trim()).find(|s| !s.is_empty() && title.contains(&s.to_lowercase())).map(str::to_string)
+    sites
+        .iter()
+        .map(|s| s.trim())
+        .find(|s| {
+            let kw = clean_site_keyword(s).to_lowercase();
+            !kw.is_empty() && title.contains(&kw)
+        })
+        .map(str::to_string)
 }
+
 
 fn allowed(allow_until: Option<Instant>, now: Instant) -> bool {
     allow_until.is_some_and(|t| now < t)
