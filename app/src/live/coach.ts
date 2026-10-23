@@ -30,11 +30,15 @@ export function setGuardPrefs(patch: Partial<FocusGuardPrefs>) {
   save("focusGuard", { ...guardPrefs(), ...patch });
 }
 
-/** "a, b,\nc" → ["a", "b", "c"], deduped case-insensitively. */
-export function parseList(text: string): string[] {
-  const seen = new Set<string>();
-  return text.split(/[,\n]/).map((s) => s.trim()).filter((s) => s && !seen.has(s.toLowerCase()) && seen.add(s.toLowerCase()));
-}
+import {
+  parseList,
+  cleanBlockItem,
+  isRecapDue,
+  suggest,
+  type WeekReportData,
+} from "./coach-utils";
+
+export { parseList, cleanBlockItem, isRecapDue, suggest, type WeekReportData };
 
 export interface WeekReport {
   focusMin: number;
@@ -46,30 +50,6 @@ export interface WeekReport {
   topDistraction: string | null;
   screenSecs: number;
   suggestions: string[];
-}
-
-/** One or two concrete suggestions from the week's numbers, most useful first. */
-export function suggest(r: Omit<WeekReport, "suggestions">): string[] {
-  const out: string[] = [];
-  const pct = (a: number, b: number) => Math.round(((a - b) / Math.max(1, b)) * 100);
-  if (r.distractSecs > 1800 && r.distractSecs > r.distractSecsLast * 1.2) {
-    const what = r.topDistraction ? `${r.topDistraction} mostly` : "mostly block-listed apps";
-    out.push(`Distracting time is up ${r.distractSecsLast ? `${pct(r.distractSecs, r.distractSecsLast)}%` : "from zero"} on last week (${what}). Start a focus block before you open it.`);
-  }
-  if (r.focusMin < 150) {
-    out.push(`Only ${r.focusMin} focus minutes this week. One 25-minute block each morning would give you ${r.focusMin + 175}.`);
-  } else if (r.focusMin < r.focusMinLast * 0.8) {
-    out.push(`Focus time fell from ${r.focusMinLast} to ${r.focusMin} minutes. Put two blocks on your calendar for tomorrow.`);
-  }
-  const top = r.topApps[0];
-  if (top && r.screenSecs > 0 && top.secs / r.screenSecs > 0.4 && out.length < 2) {
-    out.push(`${top.name} took ${Math.round((top.secs / r.screenSecs) * 100)}% of your screen time. Set a daily limit on it in Screen time.`);
-  }
-  if (r.distractSecs > 0 && r.distractSecs < r.distractSecsLast * 0.8 && out.length < 2) {
-    out.push(`Distracting time is down ${-pct(r.distractSecs, r.distractSecsLast)}% on last week. Keep the same block list.`);
-  }
-  if (!out.length) out.push(r.streak > 1 ? `Solid week. Keep the ${r.streak}-day focus streak alive with one block tomorrow.` : "Solid week. One focus block tomorrow starts a new streak.");
-  return out.slice(0, 2);
 }
 
 function dayKey(offset: number): string {
@@ -121,13 +101,9 @@ class CoachCore {
       save("focusLog", this.log);
     }
 
-    const m = /^(\d{1,2}):(\d{2})$/.exec(g.recap);
-    if (m && load<string>("recapOn", "") !== today()) {
-      const now = new Date();
-      if (now.getHours() * 60 + now.getMinutes() >= Number(m[1]) * 60 + Number(m[2])) {
-        save("recapOn", today());
-        void this.recap();
-      }
+    if (isRecapDue(g.recap, load<string>("recapOn", ""), today())) {
+      save("recapOn", today());
+      void this.recap();
     }
   }
 
