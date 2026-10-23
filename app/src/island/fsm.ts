@@ -3,6 +3,18 @@
 
 export type FsmState = "hidden" | "petit" | "home" | "winsle";
 
+/**
+ * Sanitizes timer delays ensuring they are finite, non-NaN, and respect a minimum bound.
+ */
+export function sanitizeDelay(delay: unknown, fallback: number, min = 0): number {
+  if (typeof delay !== "number" || !Number.isFinite(delay) || Number.isNaN(delay)) {
+    return fallback;
+  }
+  return Math.max(min, delay);
+}
+
+type TimerHandle = ReturnType<typeof setTimeout>;
+
 export class IslandStateMachine {
   state: FsmState = "hidden";
 
@@ -22,9 +34,9 @@ export class IslandStateMachine {
   /** An alert waiting for an answer stays open, even when the mouse leaves. */
   pinned = false;
 
-  private petitHide: number | null = null;
-  private homeCollapse: number | null = null;
-  private greetCollapse: number | null = null;
+  private petitHide: TimerHandle | null = null;
+  private homeCollapse: TimerHandle | null = null;
+  private greetCollapse: TimerHandle | null = null;
 
   // ── Inputs ──────────────────────────────────────────────────────────────────
 
@@ -110,33 +122,37 @@ export class IslandStateMachine {
 
   private schedulePetitHide() {
     this.clear("petitHide");
-    if (!Number.isFinite(this.petitToHiddenDelay)) return;
-    this.petitHide = window.setTimeout(() => {
+    if (!Number.isFinite(this.petitToHiddenDelay) || this.petitToHiddenDelay <= 0) return;
+    const delay = sanitizeDelay(this.petitToHiddenDelay, Infinity, 0);
+    if (!Number.isFinite(delay)) return;
+    this.petitHide = globalThis.setTimeout(() => {
       this.petitHide = null;
       if (this.state === "petit") this.transition("hidden");
-    }, this.petitToHiddenDelay * 1000);
+    }, delay * 1000);
   }
 
   private scheduleHomeCollapse(delay = this.homeToPetitDelay) {
     this.clear("homeCollapse");
     if (this.pinned) return;
-    this.homeCollapse = window.setTimeout(() => {
+    const safeDelay = sanitizeDelay(delay, this.homeToPetitDelay, 0);
+    this.homeCollapse = globalThis.setTimeout(() => {
       this.homeCollapse = null;
       if (this.state === "home") this.transition("petit");
-    }, delay * 1000);
+    }, safeDelay * 1000);
   }
 
   private scheduleGreetCollapse(delay: number) {
     this.clear("greetCollapse");
-    this.greetCollapse = window.setTimeout(() => {
+    const safeDelay = sanitizeDelay(delay, this.greetAutoCollapseDelay, 0);
+    this.greetCollapse = globalThis.setTimeout(() => {
       this.greetCollapse = null;
       if (this.state === "winsle") this.transition("petit");
-    }, delay * 1000);
+    }, safeDelay * 1000);
   }
 
   private clear(which: "petitHide" | "homeCollapse" | "greetCollapse") {
     const id = this[which];
-    if (id != null) window.clearTimeout(id);
+    if (id != null) globalThis.clearTimeout(id);
     this[which] = null;
   }
 
@@ -150,6 +166,11 @@ export class IslandStateMachine {
     if (next === this.state) return;
     const from = this.state;
     this.state = next;
-    this.onTransition?.(from, next);
+    try {
+      this.onTransition?.(from, next);
+    } catch (err) {
+      console.error(`[FSM] Transition error from ${from} to ${next}:`, err);
+    }
   }
 }
+
