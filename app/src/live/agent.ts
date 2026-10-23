@@ -12,6 +12,25 @@ import { load, prefs, save, today } from "./prefs";
 import { Live, fmtHM, fmtTime, fmtUntil } from "./store";
 import { Spotify } from "./spotify";
 import { quickEvent } from "./calendar-actions";
+import {
+  parseMinutes,
+  parseClock,
+  sanitizePrompt,
+  sanitizeSnippet,
+  sanitizeReminder,
+  trimHistory,
+  greeting,
+} from "./agent-utils";
+
+export {
+  parseMinutes,
+  parseClock,
+  sanitizePrompt,
+  sanitizeSnippet,
+  sanitizeReminder,
+  trimHistory,
+  greeting,
+};
 
 export interface Reminder {
   id: number;
@@ -56,27 +75,6 @@ Tools:
 - none {} (just answer in "reply", max 2 sentences)
 Today is {DATE}, the time is {TIME}.`;
 
-function parseMinutes(n: string, unit: string): number {
-  const v = parseFloat(n);
-  return /^h/i.test(unit) ? v * 60 : /^s/i.test(unit) ? v / 60 : v;
-}
-
-/** "5pm", "17:30", "9:15 am" → next occurrence as epoch ms. */
-function parseClock(s: string): number | null {
-  const m = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i.exec(s.trim());
-  if (!m) return null;
-  let hr = +m[1];
-  const min = +(m[2] ?? 0);
-  const ap = m[3]?.toLowerCase();
-  if (ap === "pm" && hr < 12) hr += 12;
-  if (ap === "am" && hr === 12) hr = 0;
-  if (hr > 23 || min > 59) return null;
-  const d = new Date();
-  d.setHours(hr, min, 0, 0);
-  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
-  return d.getTime();
-}
-
 class AgentCore {
   reminders: Reminder[] = load<Reminder[]>("reminders", []);
   snippets: Snippet[] = load<Snippet[]>("snippets", []);
@@ -92,13 +90,17 @@ class AgentCore {
   private limitSeen = new Set<string>();
 
   constructor() {
-    window.setInterval(() => this.tick(), 5000);
+    if (typeof window !== "undefined") {
+      window.setInterval(() => this.tick(), 5000);
+    }
   }
 
   // ── Reminders ───────────────────────────────────────────────────────────────
 
   addReminder(text: string, at: number) {
-    this.reminders = [...this.reminders, { id: Date.now(), text: text.trim() || "Reminder", at }].sort((a, b) => a.at - b.at);
+    const item = sanitizeReminder(text, at);
+    if (!item) return;
+    this.reminders = [...this.reminders, item].sort((a, b) => a.at - b.at);
     save("reminders", this.reminders);
     State.notify();
   }
@@ -117,9 +119,9 @@ class AgentCore {
   // ── Snippets ────────────────────────────────────────────────────────────────
 
   saveSnippet(name: string, text: string) {
-    const n = name.trim().replace(/^;/, "");
-    if (!n || !text.trim()) return;
-    this.snippets = [{ name: n, text }, ...this.snippets.filter((s) => s.name.toLowerCase() !== n.toLowerCase())].slice(0, 40);
+    const s = sanitizeSnippet(name, text);
+    if (!s) return;
+    this.snippets = [s, ...this.snippets.filter((x) => x.name.toLowerCase() !== s.name.toLowerCase())].slice(0, 40);
     save("snippets", this.snippets);
     State.notify();
   }
@@ -289,7 +291,10 @@ class AgentCore {
   // ── Requests ────────────────────────────────────────────────────────────────
 
   async ask(q: string): Promise<AgentReply> {
-    const text = q.trim().replace(/^(\?|ask)\s*/i, "");
+    const text = sanitizePrompt(q);
+    if (!text) {
+      return { text: "How can I help you?", did: [], ai: false };
+    }
     this.busy = true;
     State.notify();
     let reply: AgentReply;
@@ -300,7 +305,7 @@ class AgentCore {
       reply = { text: String(err).replace(/^Error:\s*/, ""), did: [], ai: false };
     }
     this.busy = false;
-    this.history = [{ q: text, a: reply, at: Date.now() }, ...this.history].slice(0, 8);
+    this.history = trimHistory([{ q: text, a: reply, at: Date.now() }, ...this.history], 8);
     State.notify();
     return reply;
   }
@@ -478,9 +483,5 @@ class AgentCore {
   }
 }
 
-function greeting(): string {
-  const h = new Date().getHours();
-  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-}
-
 export const Agent = new AgentCore();
+
