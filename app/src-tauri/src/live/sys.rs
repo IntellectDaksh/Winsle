@@ -103,19 +103,19 @@ fn net_bytes() -> Option<(u64, u64)> {
     }
 }
 
-/// Bytes/s between two samples; None if counters went backwards (adapter reset).
-fn net_rate(a: (u64, u64), b: (u64, u64), secs: f64) -> (Option<f64>, Option<f64>) {
-    if secs <= 0.0 || b.0 < a.0 || b.1 < a.1 {
+/// Bytes/s between two samples; None if counters went backwards (adapter reset) or duration is invalid.
+pub fn net_rate(a: (u64, u64), b: (u64, u64), secs: f64) -> (Option<f64>, Option<f64>) {
+    if secs <= 0.0 || !secs.is_finite() || b.0 < a.0 || b.1 < a.1 {
         return (None, None);
     }
     (Some(((b.0 - a.0) as f64 / secs).round()), Some(((b.1 - a.1) as f64 / secs).round()))
 }
 
 #[derive(Clone, Copy)]
-struct CpuTimes {
-    idle: u64,
-    kernel: u64, // includes idle
-    user: u64,
+pub struct CpuTimes {
+    pub idle: u64,
+    pub kernel: u64, // includes idle
+    pub user: u64,
 }
 
 fn ft(f: FILETIME) -> u64 {
@@ -128,31 +128,43 @@ fn cpu_times() -> Option<CpuTimes> {
     Some(CpuTimes { idle: ft(i), kernel: ft(k), user: ft(u) })
 }
 
-fn cpu_pct(a: CpuTimes, b: CpuTimes) -> f64 {
+pub fn cpu_pct(a: CpuTimes, b: CpuTimes) -> f64 {
     let idle = b.idle.saturating_sub(a.idle);
     let total = b.kernel.saturating_sub(a.kernel) + b.user.saturating_sub(a.user);
     if total == 0 {
         return 0.0;
     }
-    round1((1.0 - idle as f64 / total as f64) * 100.0).clamp(0.0, 100.0)
+    let active = total.saturating_sub(idle);
+    round1((active as f64 / total as f64) * 100.0).clamp(0.0, 100.0)
+}
+
+/// Computes (ram_used_gb, ram_total_gb, ram_pct) with safe bounds and division by zero protection.
+pub fn calc_ram_metrics(total_bytes: u64, avail_bytes: u64) -> (f64, f64, f64) {
+    if total_bytes == 0 {
+        return (0.0, 0.0, 0.0);
+    }
+    let used = total_bytes.saturating_sub(avail_bytes);
+    let used_gb = round1(used as f64 / GB);
+    let total_gb = round1(total_bytes as f64 / GB);
+    let pct = round1(used as f64 * 100.0 / total_bytes as f64).clamp(0.0, 100.0);
+    (used_gb, total_gb, pct)
 }
 
 fn ram() -> (f64, f64, f64) {
     let mut m = MEMORYSTATUSEX { dwLength: std::mem::size_of::<MEMORYSTATUSEX>() as u32, ..Default::default() };
-    if unsafe { GlobalMemoryStatusEx(&mut m) }.is_err() || m.ullTotalPhys == 0 {
+    if unsafe { GlobalMemoryStatusEx(&mut m) }.is_err() {
         return (0.0, 0.0, 0.0);
     }
-    let used = m.ullTotalPhys - m.ullAvailPhys;
-    (
-        round1(used as f64 / GB),
-        round1(m.ullTotalPhys as f64 / GB),
-        round1(used as f64 * 100.0 / m.ullTotalPhys as f64),
-    )
+    calc_ram_metrics(m.ullTotalPhys, m.ullAvailPhys)
 }
 
-fn round1(x: f64) -> f64 {
+pub fn round1(x: f64) -> f64 {
+    if !x.is_finite() {
+        return 0.0;
+    }
     (x * 10.0).round() / 10.0
 }
+
 
 #[repr(C)]
 #[derive(Default)]
