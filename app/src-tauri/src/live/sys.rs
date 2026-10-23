@@ -249,6 +249,51 @@ mod tests {
     }
 
     #[test]
+    fn metrics_guards() {
+        // round1 NaN and Infinity guards
+        assert_eq!(round1(42.34), 42.3);
+        assert_eq!(round1(42.36), 42.4);
+        assert_eq!(round1(f64::NAN), 0.0);
+        assert_eq!(round1(f64::INFINITY), 0.0);
+        assert_eq!(round1(f64::NEG_INFINITY), 0.0);
+
+        // net_rate with non-finite seconds or zero
+        assert_eq!(net_rate((0, 0), (100, 100), 0.0), (None, None));
+        assert_eq!(net_rate((0, 0), (100, 100), -1.0), (None, None));
+        assert_eq!(net_rate((0, 0), (100, 100), f64::NAN), (None, None));
+        assert_eq!(net_rate((0, 0), (100, 100), f64::INFINITY), (None, None));
+
+        // cpu_pct saturation and clock jitter
+        let a = CpuTimes { idle: 100, kernel: 100, user: 100 };
+        let b = CpuTimes { idle: 300, kernel: 150, user: 120 }; // idle increased more than kernel+user
+        assert_eq!(cpu_pct(a, b), 0.0);
+
+        let c = CpuTimes { idle: 100, kernel: 100, user: 100 };
+        let d = CpuTimes { idle: 100, kernel: 200, user: 200 }; // 0 idle in interval
+        assert_eq!(cpu_pct(c, d), 100.0);
+    }
+
+    #[test]
+    fn ram_math() {
+        let gb_bytes = 1024 * 1024 * 1024;
+        let total = 16 * gb_bytes;
+        let avail = 4 * gb_bytes; // 12 used
+        let (used_gb, total_gb, pct) = calc_ram_metrics(total, avail);
+        assert_eq!(used_gb, 12.0);
+        assert_eq!(total_gb, 16.0);
+        assert_eq!(pct, 75.0);
+
+        // Zero total bytes should not divide by zero
+        assert_eq!(calc_ram_metrics(0, 0), (0.0, 0.0, 0.0));
+
+        // Avail exceeding total (counter glitch)
+        let (used_glitch, total_glitch, pct_glitch) = calc_ram_metrics(total, total + 1000);
+        assert_eq!(used_glitch, 0.0);
+        assert_eq!(total_glitch, 16.0);
+        assert_eq!(pct_glitch, 0.0);
+    }
+
+    #[test]
     #[ignore]
     fn print_live() {
         let nv = Nvml::load();
@@ -257,3 +302,4 @@ mod tests {
         println!("SYS: nvml={} {:?}", nv.is_some(), snapshot(a, cpu_times(), nv.as_ref()));
     }
 }
+
