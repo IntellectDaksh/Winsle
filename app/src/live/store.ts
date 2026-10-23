@@ -9,7 +9,8 @@ import { State } from "../core/state";
 import { load, prefs, save, today } from "./prefs";
 import { trackChanged } from "./lyrics";
 import { isSecretText } from "./security";
-import { hsl, isNoise, appColor, sanitizeNotificationText } from "./formatters";
+import { hsl } from "./formatters";
+import { isNoise, appColor, sanitizeNotificationText } from "./notif-utils";
 import type { AppUsage, ColorInfo, TaskLine } from "./types";
 import type {
   CalendarEvent, CalendarInfo, ClipInfo, MediaInfo, NetInfo, PowerInfo, VolumeInfo, NotifInfo, PrivacyInfo, ProgressItem, ProgressInfo, SysInfo,
@@ -836,3 +837,4 @@ export const Live = new LiveStore();
 // ── Formatting ────────────────────────────────────────────────────────────────
 
 export * from "./formatters";
+export * from "./notif-utils";

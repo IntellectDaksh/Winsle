@@ -18,14 +18,22 @@ export const Ease = {
 export type EaseFn = (t: number) => number;
 
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-export const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-export const seg = (t: number, a: number, b: number) => clamp((t - a) / (b - a), 0, 1);
+export const clamp = (v: number, lo: number, hi: number) => {
+  if (!Number.isFinite(v)) return lo;
+  return Math.max(lo, Math.min(hi, v));
+};
+export const seg = (t: number, a: number, b: number) => {
+  if (b === a || !Number.isFinite(t)) return 0;
+  return clamp((t - a) / (b - a), 0, 1);
+};
 
 /** cubic-bezier(x1,y1,x2,y2) — used for the 340 ms close curve (.45,0,.2,1). */
 export function cubicBezier(x1: number, y1: number, x2: number, y2: number): EaseFn {
   const cx = (t: number) => ((1 - t) ** 2 * 3 * t * x1) + (3 * (1 - t) * t * t * x2) + t ** 3;
   const cy = (t: number) => ((1 - t) ** 2 * 3 * t * y1) + (3 * (1 - t) * t * t * y2) + t ** 3;
   return (x) => {
+    if (!Number.isFinite(x) || x <= 0) return 0;
+    if (x >= 1) return 1;
     // Newton-ish bisection on x — 12 iterations is plenty at 60 fps.
     let lo = 0;
     let hi = 1;
@@ -54,20 +62,26 @@ export class Spring {
   zeta: number;
 
   constructor(value: number, response = 0.5, damping = 0.72) {
-    this.value = value;
-    this.target = value;
-    this.omega = (2 * Math.PI) / response;
-    this.zeta = damping;
+    const safeVal = Number.isFinite(value) ? value : 0;
+    this.value = safeVal;
+    this.target = safeVal;
+    const r = Number.isFinite(response) && response > 0.01 ? response : 0.5;
+    const d = Number.isFinite(damping) && damping >= 0 ? damping : 0.72;
+    this.omega = (2 * Math.PI) / r;
+    this.zeta = d;
   }
 
   configure(response: number, damping: number) {
-    this.omega = (2 * Math.PI) / response;
-    this.zeta = damping;
+    const r = Number.isFinite(response) && response > 0.01 ? response : 0.5;
+    const d = Number.isFinite(damping) && damping >= 0 ? damping : 0.72;
+    this.omega = (2 * Math.PI) / r;
+    this.zeta = d;
   }
 
   set(value: number) {
-    this.value = value;
-    this.target = value;
+    const safeVal = Number.isFinite(value) ? value : 0;
+    this.value = safeVal;
+    this.target = safeVal;
     this.velocity = 0;
   }
 
@@ -76,8 +90,11 @@ export class Spring {
   }
 
   step(dt: number) {
-    const steps = Math.max(1, Math.ceil(dt / (1 / 240)));
-    const h = dt / steps;
+    if (!Number.isFinite(dt) || dt <= 0) return;
+    // Cap dt to 0.1s to prevent lag spike destabilisation or runaway iterations
+    const clampedDt = Math.min(0.1, dt);
+    const steps = Math.min(24, Math.max(1, Math.ceil(clampedDt / (1 / 240))));
+    const h = clampedDt / steps;
     for (let i = 0; i < steps; i++) {
       const acc =
         this.omega * this.omega * (this.target - this.value) -
@@ -120,17 +137,20 @@ export class Tracked {
   /** Spring to `v` (open / grow). */
   springTo(v: number, response = 0.5, damping = 0.72) {
     this.spring.configure(response, damping);
-    this.spring.target = v;
+    this.spring.target = Number.isFinite(v) ? v : 0;
     this.mode = "spring";
   }
 
   /** Timed curve to `v` (close / shrink), no overshoot. */
   curveTowards(v: number, durationMs = 340, now = performance.now()) {
+    const safeV = Number.isFinite(v) ? v : 0;
+    const safeDur = Number.isFinite(durationMs) && durationMs > 0 ? durationMs : 340;
+    const safeNow = Number.isFinite(now) ? now : performance.now();
     this.curveFrom = this.spring.value;
-    this.curveTo = v;
-    this.curveStart = now;
-    this.curveDur = durationMs;
-    this.spring.target = v;
+    this.curveTo = safeV;
+    this.curveStart = safeNow;
+    this.curveDur = safeDur;
+    this.spring.target = safeV;
     this.spring.velocity = 0;
     this.mode = "curve";
   }
@@ -144,9 +164,11 @@ export class Tracked {
         this.mode = "idle";
       }
     } else if (this.mode === "curve") {
-      const p = clamp((now - this.curveStart) / this.curveDur, 0, 1);
+      const safeNow = Number.isFinite(now) ? now : performance.now();
+      const p = clamp((safeNow - this.curveStart) / this.curveDur, 0, 1);
       this.spring.value = lerp(this.curveFrom, this.curveTo, closeCurve(p));
       if (p >= 1) {
+        this.spring.value = this.curveTo;
         this.spring.velocity = 0;
         this.mode = "idle";
       }

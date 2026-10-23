@@ -87,11 +87,3 @@ export function fmtHM(secs: number): string {
   const m = Math.round(secs / 60);
   return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`;
 }
-
-export {
-  NOISE_APPS,
-  NOISE_TEXT,
-  isNoise,
-  sanitizeNotificationText,
-  appColor,
-} from "./notif-utils.ts";
