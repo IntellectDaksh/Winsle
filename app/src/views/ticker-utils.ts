@@ -13,7 +13,7 @@ export const TICKER_CONSTANTS = {
  * Computes the scale factor for a given transition phase in [0, 1].
  */
 export function calcRowScale(phase: number, completedScale = TICKER_CONSTANTS.COMPLETED_SCALE): number {
-  const p = Math.max(0, Math.min(1, Number.isFinite(phase) ? phase : 0));
+  const p = Number.isNaN(phase) ? 0 : Math.max(0, Math.min(1, phase));
   return 1 - p * (1 - completedScale);
 }
 
@@ -26,7 +26,7 @@ export function calcRowOpacities(phase: number): {
   shimmer: number;
   dim: number;
 } {
-  const p = Math.max(0, Math.min(1, Number.isFinite(phase) ? phase : 0));
+  const p = Number.isNaN(phase) ? 0 : Math.max(0, Math.min(1, phase));
   return {
     chevron: Math.max(0, Math.min(1, 1 - p * 2)),
     check: Math.max(0, Math.min(1, p * 2 - 1)),
