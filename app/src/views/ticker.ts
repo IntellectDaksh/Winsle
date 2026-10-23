@@ -11,13 +11,23 @@ import { h, svg } from "./dom";
 import { ICONS } from "./icons";
 import { cubicBezier, clamp, lerp } from "../core/anim";
 import type { AgentTask } from "../core/state";
+import {
+  TICKER_CONSTANTS,
+  calcRowScale,
+  calcRowOpacities,
+  enqueueSteps,
+  calcTickerProgress,
+} from "./ticker-utils";
 
-const ROW_H = 22;
-/** One step transition, milliseconds. */
-const DURATION = 380;
-/** Beyond this many queued steps we stop trying to show them all. */
-const MAX_QUEUE = 4;
-const COMPLETED_SCALE = 11.5 / 13; // 0.885 — the completed font size
+export {
+  TICKER_CONSTANTS,
+  calcRowScale,
+  calcRowOpacities,
+  enqueueSteps,
+  calcTickerProgress,
+};
+
+const { ROW_H, DURATION, MAX_QUEUE } = TICKER_CONSTANTS;
 const EASE = cubicBezier(0.4, 0, 0.2, 1);
 
 interface Row {
@@ -61,13 +71,15 @@ function setText(row: Row, text: string) {
  * (dim, shifted up-left and scaled down) — same crossfades as the Swift view.
  */
 function place(row: Row, y: number, phase: number, opacity: number) {
-  const scale = 1 - phase * (1 - COMPLETED_SCALE);
-  row.el.style.transform = `translate(${-phase * 10}px, ${y}px) scale(${scale})`;
-  row.el.style.opacity = String(opacity);
-  row.chevron.style.opacity = String(clamp(1 - phase * 2, 0, 1));
-  row.check.style.opacity = String(clamp(phase * 2 - 1, 0, 1));
-  row.shimmer.style.opacity = String(clamp(1 - phase * 1.6, 0, 1));
-  row.dim.style.opacity = String(clamp(phase * 2 - 0.4, 0, 1));
+  const safePhase = clamp(Number.isFinite(phase) ? phase : 0, 0, 1);
+  const scale = calcRowScale(safePhase);
+  const op = calcRowOpacities(safePhase);
+  row.el.style.transform = `translate(${-safePhase * 10}px, ${y}px) scale(${scale})`;
+  row.el.style.opacity = String(clamp(Number.isFinite(opacity) ? opacity : 0, 0, 1));
+  row.chevron.style.opacity = String(op.chevron);
+  row.check.style.opacity = String(op.check);
+  row.shimmer.style.opacity = String(op.shimmer);
+  row.dim.style.opacity = String(op.dim);
 }
 
 export class Ticker {
@@ -99,30 +111,15 @@ export class Ticker {
     const steps = task && task.steps.length > 0 ? task.steps : ["…"];
     const idx = task ? Math.min(task.stepIndex, steps.length - 1) : -1;
 
-    // First render: drop straight into place, no animation.
-    if (this.displayIndex < 0) {
-      this.displayIndex = idx;
-      setText(this.a, idx > 0 ? steps[idx - 1] : "…");
-      setText(this.b, steps[Math.max(idx, 0)]);
-      this.rest();
-      return;
-    }
+    const res = enqueueSteps(this.queue, steps, this.displayIndex, idx, MAX_QUEUE);
+    this.displayIndex = res.displayIndex;
+    this.queue = res.queue;
 
-    // The session restarted (steps were cleared): re-seed rather than scroll.
-    if (idx < this.displayIndex) {
-      this.queue = [];
+    if (res.reset) {
       this.startMs = null;
-      this.displayIndex = idx;
       setText(this.a, idx > 0 ? steps[idx - 1] : "…");
       setText(this.b, steps[Math.max(idx, 0)]);
       this.rest();
-      return;
-    }
-
-    for (let i = this.displayIndex + 1; i <= idx; i++) this.queue.push(steps[i]);
-    this.displayIndex = idx;
-    if (this.queue.length > MAX_QUEUE) {
-      this.queue = this.queue.slice(-MAX_QUEUE);
     }
   }
 
@@ -135,7 +132,7 @@ export class Ticker {
       this.startMs = nowMs;
     }
 
-    const p = clamp((nowMs - this.startMs) / DURATION, 0, 1);
+    const p = calcTickerProgress(this.startMs, nowMs, DURATION);
     const e = EASE(p);
 
     // A leaves upwards and fades a little faster than it moves, as on macOS.
@@ -154,3 +151,4 @@ export class Ticker {
     this.rest();
   }
 }
+
