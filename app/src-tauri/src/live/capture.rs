@@ -276,4 +276,33 @@ mod tests {
         assert!(task_line(" \n\t", "x").is_err());
         assert_eq!(task_line(&"a".repeat(5000), "x").unwrap().len(), 4000 + "- [ ]   _(x)_\n".len());
     }
+
+    #[test]
+    fn test_sanitize_and_inbox_path() {
+        let def = Some(PathBuf::from("C:\\Users\\User\\Documents\\Winsle"));
+        assert_eq!(
+            resolve_inbox_path("", def.clone()).unwrap(),
+            PathBuf::from("C:\\Users\\User\\Documents\\Winsle\\inbox.md")
+        );
+        assert_eq!(
+            resolve_inbox_path("   ", def.clone()).unwrap(),
+            PathBuf::from("C:\\Users\\User\\Documents\\Winsle\\inbox.md")
+        );
+        assert_eq!(
+            resolve_inbox_path("D:\\Notes", def.clone()).unwrap(),
+            PathBuf::from("D:\\Notes\\inbox.md")
+        );
+        assert!(resolve_inbox_path("   ", None).is_err());
+        assert!(resolve_inbox_path("D:\\Invalid\0Path", def).is_err());
+
+        let raw = "hello\x00world\x1b[31mwith\tnewline\nend";
+        let cleaned = sanitize_task_text(raw);
+        assert!(!cleaned.contains('\0'));
+        assert!(!cleaned.contains('\x1b'));
+        assert_eq!(
+            task_line("hello\x00world\ttask", "2026-10-23").unwrap(),
+            "- [ ] hello world task  _(2026-10-23)_\n"
+        );
+    }
 }
+
