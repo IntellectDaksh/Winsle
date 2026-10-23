@@ -59,7 +59,10 @@ export const eBack = (t: number) => {
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 };
 
-export const seg = (t: number, a: number, b: number) => Math.max(0, Math.min(1, (t - a) / (b - a)));
+export const seg = (t: number, a: number, b: number) => {
+  if (b === a || !Number.isFinite(t)) return 0;
+  return Math.max(0, Math.min(1, (t - a) / (b - a)));
+};
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /** Squeeze keyframes for the suckEnd → chew1 phase. */
@@ -86,9 +89,10 @@ function squeezeX(t: number): number {
  * last push. A plain ease-out reads as a different animation entirely.
  */
 export function uploadProgressCurve(u: number): number {
-  if (u < 0.4) return 0.6 * eOut(u / 0.4);
-  if (u < 0.85) return 0.6 + 0.32 * eInOut((u - 0.4) / 0.45);
-  return 0.92 + 0.08 * eIn((u - 0.85) / 0.15);
+  const clamped = Math.max(0, Math.min(1, Number.isFinite(u) ? u : 0));
+  if (clamped < 0.4) return 0.6 * eOut(clamped / 0.4);
+  if (clamped < 0.85) return 0.6 + 0.32 * eInOut((clamped - 0.4) / 0.45);
+  return 0.92 + 0.08 * eIn((clamped - 0.85) / 0.15);
 }
 
 export function progressAt(t: number, progStart: number, progEnd: number): number {
@@ -103,11 +107,15 @@ class USSpring {
   constructor(public v: number) {}
 
   step(target: number, response: number, damping: number, dt: number) {
-    const k = Math.pow((2 * Math.PI) / response, 2);
-    const c = 2 * damping * Math.sqrt(k);
+    if (!Number.isFinite(dt) || dt <= 0) return;
+    const r = Number.isFinite(response) && response > 0.01 ? response : 0.3;
+    const d = Number.isFinite(damping) && damping >= 0 ? damping : 0.7;
+    const clampedDt = Math.min(0.05, dt);
+    const k = Math.pow((2 * Math.PI) / r, 2);
+    const c = 2 * d * Math.sqrt(k);
     const a = k * (target - this.v) - c * this.vel;
-    this.vel += a * dt;
-    this.v += this.vel * dt;
+    this.vel += a * clampedDt;
+    this.v += this.vel * clampedDt;
   }
 }
 
@@ -276,7 +284,7 @@ class UploadSequence {
   exitZone() {}
 
   performDrop(uploadDuration: number) {
-    this.uploadDuration = uploadDuration;
+    this.uploadDuration = Number.isFinite(uploadDuration) && uploadDuration > 0.1 ? uploadDuration : 2.4;
     this.dropWall = this.now();
     // Restart the canonical post-drop timeline however long the user hovered.
     // Spring state (position and velocity) is deliberately preserved.
