@@ -104,7 +104,10 @@ export function progressAt(t: number, progStart: number, progEnd: number): numbe
 /** The reference `spring(s, target, response, damping, dt)`, integrated by hand. */
 class USSpring {
   vel = 0;
-  constructor(public v: number) {}
+  v: number;
+  constructor(v: number) {
+    this.v = v;
+  }
 
   step(target: number, response: number, damping: number, dt: number) {
     if (!Number.isFinite(dt) || dt <= 0) return;
