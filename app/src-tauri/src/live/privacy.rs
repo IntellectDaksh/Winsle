@@ -79,8 +79,12 @@ fn qword(k: &Key, name: &str) -> u64 {
     if r.is_ok() && len == 8 { v } else { 0 }
 }
 
+pub(crate) fn is_active_access(start_time: u64, stop_time: u64) -> bool {
+    start_time != 0 && stop_time == 0
+}
+
 fn active(k: &Key) -> bool {
-    qword(k, "LastUsedTimeStart") != 0 && qword(k, "LastUsedTimeStop") == 0
+    is_active_access(qword(k, "LastUsedTimeStart"), qword(k, "LastUsedTimeStop"))
 }
 
 fn in_use(cap: &str) -> Vec<String> {
@@ -101,14 +105,15 @@ fn in_use(cap: &str) -> Vec<String> {
     names.into_iter().filter(|n| !n.is_empty()).collect()
 }
 
-fn capitalise(s: &str) -> String {
-    let mut c = s.chars();
+pub(crate) fn capitalise(s: &str) -> String {
+    let trimmed = s.trim();
+    let mut c = trimmed.chars();
     c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
 }
 
 /// "C:#Program Files#Google#Chrome#Application#chrome.exe" → "Chrome"
-fn exe_name(path: &str) -> String {
-    let file = path.rsplit(['#', '\\']).next().unwrap_or(path);
+pub(crate) fn exe_name(path: &str) -> String {
+    let file = path.rsplit(['#', '\\', '/']).next().unwrap_or(path).trim();
     let stem = file.strip_suffix(".exe").or_else(|| file.strip_suffix(".EXE")).unwrap_or(file);
     match stem.to_ascii_lowercase().as_str() {
         "msedge" | "msedgewebview2" => "Edge".into(),
@@ -118,7 +123,7 @@ fn exe_name(path: &str) -> String {
 }
 
 /// "Microsoft.WindowsCamera_8wekyb3d8bbwe" → "WindowsCamera"
-fn package_name(pkg: &str) -> String {
+pub(crate) fn package_name(pkg: &str) -> String {
     let base = pkg.split('_').next().unwrap_or(pkg);
     capitalise(base.rsplit('.').next().unwrap_or(base))
 }
