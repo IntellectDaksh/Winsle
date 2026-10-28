@@ -95,6 +95,34 @@ pub fn start(app: AppHandle) {
     });
 }
 
+pub(crate) fn parse_frame(buf: &[u8]) -> Option<Value> {
+    if buf.is_empty() || buf.len() > MAX_PAYLOAD {
+        return None;
+    }
+    let line = match buf.iter().position(|b| *b == b'\n') {
+        Some(i) => &buf[..i],
+        None => buf,
+    };
+    let trimmed = match line.strip_suffix(b"\r") {
+        Some(s) => s,
+        None => line,
+    };
+    if trimmed.is_empty() {
+        return None;
+    }
+    match serde_json::from_slice::<Value>(trimmed) {
+        Ok(v) if v.is_object() => Some(v),
+        _ => None,
+    }
+}
+
+pub(crate) fn sanitize_decision(decision: &str) -> &'static str {
+    match decision.trim().to_ascii_lowercase().as_str() {
+        "allow" | "always" => "allow",
+        _ => "deny",
+    }
+}
+
 async fn handle(app: AppHandle, mut pipe: NamedPipeServer) {
     let mut buf = Vec::new();
     let mut chunk = [0u8; 4096];
@@ -110,14 +138,7 @@ async fn handle(app: AppHandle, mut pipe: NamedPipeServer) {
             Err(_) => return,
         }
     }
-    let line = match buf.iter().position(|b| *b == b'\n') {
-        Some(i) => &buf[..i],
-        None => &buf[..],
-    };
-    let Ok(mut payload) = serde_json::from_slice::<Value>(line) else { return };
-    if !payload.is_object() {
-        return;
-    }
+    let Some(mut payload) = parse_frame(&buf) else { return };
 
     let event = payload
         .get("hook_event_name")
@@ -218,10 +239,7 @@ pub fn decline(app: &AppHandle, request_id: &str) {
 /// Called by the island's Allow / Deny buttons. Only ever a bare word: turning
 /// it into Claude Code's JSON is winsle-hook's job.
 pub fn answer(app: &AppHandle, request_id: &str, decision: &str) {
-    let word = match decision {
-        "allow" | "always" => "allow",
-        _ => "deny",
-    };
+    let word = sanitize_decision(decision);
     log::line(format!("decision id={request_id} {word}"));
     send(app, request_id, Reply::Decision(word.to_string()), false);
 }
