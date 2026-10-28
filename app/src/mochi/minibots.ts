@@ -3,6 +3,13 @@
 
 import { BotEngine, hexToRGB } from "./engine";
 import type { AgentTask } from "../core/state";
+import {
+  calcMiniBotDimensions,
+  clampMinibotDt,
+  MINIBOT_BODY_SCALE,
+} from "./minibot-utils";
+
+export { calcMiniBotDimensions, clampMinibotDt, MINIBOT_BODY_SCALE };
 
 interface MiniBot {
   canvas: HTMLCanvasElement;
@@ -23,18 +30,19 @@ const live = new Map<HTMLCanvasElement, MiniBot>();
  * whole drawing to 60 %, which is what used to happen.
  */
 export function createMiniBot(task: AgentTask, bodySize: number): HTMLElement {
+  const dpr = window.devicePixelRatio || 1;
+  const dims = calcMiniBotDimensions(bodySize, dpr);
+
   const slot = document.createElement("span");
   slot.className = "mini";
-  slot.style.width = `${bodySize}px`;
-  slot.style.height = `${bodySize}px`;
+  slot.style.width = `${dims.slotSize}px`;
+  slot.style.height = `${dims.slotSize}px`;
 
   const canvas = document.createElement("canvas");
-  const engineSize = bodySize / 0.6;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  canvas.width = Math.round(engineSize * dpr);
-  canvas.height = Math.round(engineSize * dpr);
-  canvas.style.width = `${engineSize}px`;
-  canvas.style.height = `${engineSize}px`;
+  canvas.width = dims.pixelSize;
+  canvas.height = dims.pixelSize;
+  canvas.style.width = `${dims.cssSize}px`;
+  canvas.style.height = `${dims.cssSize}px`;
   slot.append(canvas);
 
   const engine = new BotEngine();
@@ -48,7 +56,7 @@ export function createMiniBot(task: AgentTask, bodySize: number): HTMLElement {
     engine.eyeOverrideUntil = Number.POSITIVE_INFINITY;
   }
 
-  live.set(canvas, { canvas, engine, cssSize: engineSize, taskId: task.id });
+  live.set(canvas, { canvas, engine, cssSize: dims.cssSize, taskId: task.id });
   return slot;
 }
 
@@ -73,11 +81,12 @@ export function syncMiniBotStates(tasks: AgentTask[]) {
 }
 
 export function tickMiniBots(dt: number) {
+  const safeDt = clampMinibotDt(dt);
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   for (const mb of live.values()) {
     const ctx = mb.canvas.getContext("2d");
     if (!ctx) continue;
-    mb.engine.update(dt);
+    mb.engine.update(safeDt);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, mb.cssSize, mb.cssSize);
     mb.engine.draw(ctx, mb.cssSize, mb.cssSize);
@@ -85,3 +94,4 @@ export function tickMiniBots(dt: number) {
 }
 
 export const miniBotCount = () => live.size;
+
