@@ -272,5 +272,31 @@ mod tests {
         assert_eq!(friendly("Code").as_deref(), Some("VS Code"));
         assert_eq!(friendly("winsle"), None);
         assert_eq!(friendly("Blender").as_deref(), Some("Blender"));
+        assert_eq!(friendly("slack").as_deref(), Some("Slack"));
+        assert_eq!(friendly("obs64").as_deref(), Some("OBS Studio"));
+        assert_eq!(friendly("   "), None);
+        assert_eq!(friendly(""), None);
+    }
+
+    #[test]
+    fn test_aggregate_top_apps() {
+        let mut d: Days = BTreeMap::new();
+        d.insert("2026-10-01".into(), day(&[("Chrome", 100), ("VS Code", 250)]));
+        d.insert("2026-10-02".into(), day(&[("Chrome", 200), ("Spotify", 50), ("VS Code", 50)]));
+
+        let top = aggregate_top_apps(&d, "2026-10-01");
+        assert_eq!(top.len(), 3);
+        // VS Code = 300, Chrome = 300 (sorted alphabetically second), Spotify = 50
+        assert_eq!(top[0], AppUsage { name: "Chrome".into(), secs: 300 });
+        assert_eq!(top[1], AppUsage { name: "VS Code".into(), secs: 300 });
+        assert_eq!(top[2], AppUsage { name: "Spotify".into(), secs: 50 });
+
+        // Filter by oldest_day: only 2026-10-02
+        let top_recent = aggregate_top_apps(&d, "2026-10-02");
+        assert_eq!(top_recent.len(), 3);
+        assert_eq!(top_recent[0], AppUsage { name: "Chrome".into(), secs: 200 });
+        assert_eq!(top_recent[1], AppUsage { name: "Spotify".into(), secs: 50 });
+        assert_eq!(top_recent[2], AppUsage { name: "VS Code".into(), secs: 50 });
     }
 }
+
