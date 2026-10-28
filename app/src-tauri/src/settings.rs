@@ -98,6 +98,12 @@ impl Settings {
         if self.home_widgets.is_empty() {
             self.home_widgets = default_home_widgets();
         }
+
+        self.render_dirs.retain(|d| !d.trim().is_empty());
+        self.render_dirs.dedup();
+        self.active_integrations.retain(|i| !i.trim().is_empty());
+        self.active_integrations.dedup();
+        self.capture_dir = self.capture_dir.trim().to_string();
     }
 }
 
@@ -125,13 +131,23 @@ fn settings_path() -> PathBuf {
     config_dir().join("settings.json")
 }
 
-pub fn load() -> Settings {
-    let mut s: Settings = match std::fs::read(settings_path()) {
-        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_default(),
-        Err(_) => Settings::default(),
-    };
+#[allow(dead_code)]
+pub fn load_from_bytes(bytes: &[u8]) -> Settings {
+    let mut s: Settings = serde_json::from_slice(bytes).unwrap_or_default();
     s.sanitize();
     s
+}
+
+#[allow(dead_code)]
+pub fn from_json_str(json: &str) -> Settings {
+    load_from_bytes(json.as_bytes())
+}
+
+pub fn load() -> Settings {
+    match std::fs::read(settings_path()) {
+        Ok(bytes) => load_from_bytes(&bytes),
+        Err(_) => Settings::default(),
+    }
 }
 
 pub fn save(settings: &Settings) -> std::io::Result<()> {
