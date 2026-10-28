@@ -1,5 +1,14 @@
 // Minimal DOM helpers — no framework, as specified.
 
+import {
+  isDangerousUri,
+  sanitizeAttributeValue,
+  sanitizeDimension,
+  parseViewBox,
+} from "./dom-utils.js";
+
+export { isDangerousUri, sanitizeAttributeValue, sanitizeDimension, parseViewBox };
+
 type Attrs = Record<string, string | number | boolean | EventListener | undefined>;
 type Child = Node | string | null | undefined | false;
 
@@ -17,7 +26,12 @@ export function h<K extends keyof HTMLElementTagNameMap>(
     else if (k.startsWith("on") && typeof v === "function") {
       el.addEventListener(k.slice(2).toLowerCase(), v as EventListener);
     } else if (k === "style") el.setAttribute("style", String(v));
-    else el.setAttribute(k, v === true ? "" : String(v));
+    else {
+      const sanitized = sanitizeAttributeValue(k, v === true ? "" : String(v));
+      if (sanitized !== null) {
+        el.setAttribute(k, sanitized);
+      }
+    }
   }
   for (const c of children) {
     if (c == null || c === false) continue;
@@ -27,10 +41,11 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 }
 
 export function svg(path: string, size = 14, opts: { fill?: string; stroke?: number } = {}): SVGSVGElement {
+  const safeSize = sanitizeDimension(size, 14);
   const el = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   el.setAttribute("viewBox", "0 0 24 24");
-  el.setAttribute("width", String(size));
-  el.setAttribute("height", String(size));
+  el.setAttribute("width", String(safeSize));
+  el.setAttribute("height", String(safeSize));
   el.setAttribute("aria-hidden", "true");
   const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
   p.setAttribute("d", path);
@@ -53,8 +68,10 @@ export function clear(el: Element) {
 
 /** Card dot used in every "who" row. */
 export function dot(color: string, size = 7): HTMLElement {
+  const safeSize = sanitizeDimension(size, 7);
   return h("i", {
     class: "dot",
-    style: `width:${size}px;height:${size}px;background:${color}`,
+    style: `width:${safeSize}px;height:${safeSize}px;background:${color}`,
   });
 }
+
