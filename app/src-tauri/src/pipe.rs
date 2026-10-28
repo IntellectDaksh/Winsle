@@ -243,3 +243,52 @@ pub fn answer(app: &AppHandle, request_id: &str, decision: &str) {
     log::line(format!("decision id={request_id} {word}"));
     send(app, request_id, Reply::Decision(word.to_string()), false);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_valid_frame() {
+        let raw = br#"{"hook_event_name":"PreToolUse","tool_name":"Bash"}"#;
+        let frame = parse_frame(raw).expect("valid frame should parse");
+        assert_eq!(frame["hook_event_name"], "PreToolUse");
+        assert_eq!(frame["tool_name"], "Bash");
+    }
+
+    #[test]
+    fn parse_frame_with_newlines_and_crlf() {
+        let raw_nl = b"{\"action\":\"ping\"}\n{\"action\":\"ignored\"}\n";
+        let frame_nl = parse_frame(raw_nl).expect("frame with newline should parse first line");
+        assert_eq!(frame_nl["action"], "ping");
+
+        let raw_crlf = b"{\"action\":\"crlf\"}\r\n";
+        let frame_crlf = parse_frame(raw_crlf).expect("frame with CRLF should strip carriage return");
+        assert_eq!(frame_crlf["action"], "crlf");
+    }
+
+    #[test]
+    fn parse_frame_rejections() {
+        assert!(parse_frame(b"").is_none());
+        assert!(parse_frame(b"   \r\n").is_none());
+        assert!(parse_frame(b"[1, 2, 3]\n").is_none());
+        assert!(parse_frame(b"\"just a string\"\n").is_none());
+        assert!(parse_frame(b"not json at all").is_none());
+
+        let oversized = vec![b'a'; MAX_PAYLOAD + 1];
+        assert!(parse_frame(&oversized).is_none());
+    }
+
+    #[test]
+    fn decision_sanitization() {
+        assert_eq!(sanitize_decision("allow"), "allow");
+        assert_eq!(sanitize_decision("always"), "allow");
+        assert_eq!(sanitize_decision(" ALLOW "), "allow");
+        assert_eq!(sanitize_decision("  ALWAYS  "), "allow");
+
+        assert_eq!(sanitize_decision("deny"), "deny");
+        assert_eq!(sanitize_decision("no"), "deny");
+        assert_eq!(sanitize_decision(""), "deny");
+        assert_eq!(sanitize_decision("cancel"), "deny");
+    }
+}
