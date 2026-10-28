@@ -7,21 +7,37 @@ import { State } from "../core/state";
 import { h } from "../views/dom";
 import { Live, fmtHM, fmtUntil } from "./store";
 import { Dev } from "./dev";
+import {
+  ROTATE_MS,
+  IDLE_DIM_MS,
+  NOTIF_FRESH_MS,
+  EVENT_SOON_MS,
+  type GistItem,
+  TIPS,
+  getClaudeStatusText,
+  calcClaudeDurationMinutes,
+  isNotificationFresh,
+  isEventComingSoon,
+  getBatteryStatus,
+  calcNextRotation,
+  getTipForTimestamp,
+} from "./idle-utils.js";
 
-const ROTATE_MS = 6000;
-/** Quiet time before the capsule dims. */
-export const IDLE_DIM_MS = 7000;
-/** A notification stays part of the gist this long. */
-const NOTIF_FRESH_MS = 30 * 60_000;
-/** An event counts as "coming up" inside this window. */
-const EVENT_SOON_MS = 3 * 60 * 60_000;
-
-interface GistItem {
-  key: string;
-  label: string; // small coloured prefix
-  color: string;
-  text: string;
-}
+export {
+  ROTATE_MS,
+  IDLE_DIM_MS,
+  NOTIF_FRESH_MS,
+  EVENT_SOON_MS,
+  type GistItem,
+  TIPS,
+  getClaudeStatusText,
+  calcClaudeDurationMinutes,
+  isNotificationFresh,
+  isEventComingSoon,
+  getBatteryStatus,
+  calcNextRotation,
+  getTipForTimestamp,
+};
 
 function clock(): GistItem {
   const d = new Date();
@@ -37,29 +53,25 @@ function gist(): GistItem[] {
   const claude = State.tasks.find((t) => t.id === "integration_claude");
   if (claude && (claude.state !== "idle" || claude.steps.length)) {
     const step = claude.steps.at(-1);
-    const status =
-      claude.state === "finished" ? "done" :
-      claude.state === "approval" ? "needs you" :
-      claude.state === "error" ? "stopped" :
-      claude.state === "idle" ? "last" : "working";
-    const since = Live.claudeSince;
-    const mins = since != null && claude.state !== "idle" ? Math.floor((performance.now() - since) / 60_000) : 0;
+    const status = getClaudeStatusText(claude.state);
+    const mins = calcClaudeDurationMinutes(Live.claudeSince, claude.state);
     items.push({ key: "claude", label: `Claude · ${status}${mins > 0 ? ` ${mins}m` : ""}`, color: "#A78BFA", text: step ?? "" });
   }
 
   const n = Live.notifs.find((x) => !x.noise);
-  if (n && Date.now() - n.time < NOTIF_FRESH_MS) {
+  if (n && isNotificationFresh(n.time)) {
     items.push({ key: `n${n.id}`, label: n.app, color: "#60A5FA", text: n.title || n.body });
   }
   items.push(...suggestions());
 
   const now = Date.now();
-  const e = Live.calendar.events.find((x) => x.end > now && x.start - now < EVENT_SOON_MS);
+  const e = Live.calendar.events.find((x) => isEventComingSoon(x.start, x.end, now));
   if (e) items.push({ key: `e${e.start}`, label: fmtUntil(e.start), color: "#F5A524", text: e.title || "Busy" });
 
   const p = Live.power;
-  if (p && p.percent != null && !p.charging && p.percent <= 30) {
-    items.push({ key: "battery", label: `Battery ${p.percent}%`, color: p.percent <= 15 ? "#F4505E" : "#F5A524", text: "not charging" });
+  if (p) {
+    const bat = getBatteryStatus(p.percent, p.charging);
+    if (bat) items.push(bat);
   }
   if (!Live.online) items.push({ key: "net", label: "Offline", color: "#F4505E", text: "no network connection" });
   if (Live.focusing()) items.push({ key: "focus", label: "Focus", color: "#F5A524", text: "notifications held until the timer ends" });
@@ -70,15 +82,6 @@ function gist(): GistItem[] {
   items.push(clock());
   return items;
 }
-
-const TIPS: [string, string][] = [
-  ["Ctrl+Alt+K", "palette — apps, maths, timers, web"],
-  ["Ctrl+Alt+L", "ghost mode — click straight through me"],
-  ["Ctrl+Alt+C", "copy the colour under your cursor"],
-  ["Ctrl+Alt+V", "everything you copied today"],
-  ["Ctrl+Alt+F", "start a 25 min focus"],
-  ["Ctrl+Alt+Space", "jot a task without switching apps"],
-];
 
 /** Small, situational nudges built from what Winsle already knows. One at most. */
 function suggestions(): GistItem[] {
@@ -100,7 +103,7 @@ function suggestions(): GistItem[] {
   const f = Live.focusToday();
   if (f.streak > 1) out.push({ key: "streak", label: `${f.streak}-day streak`, color: "#F5A524", text: `${f.minutes} min focused today` });
   // A rotating shortcut tip, about once in every few rounds.
-  const tip = TIPS[Math.floor(Date.now() / 600_000) % TIPS.length];
+  const tip = getTipForTimestamp();
   out.push({ key: `tip${tip[0]}`, label: tip[0], color: "var(--dim)", text: tip[1] });
   return out.slice(0, 2);
 }
@@ -124,10 +127,9 @@ export class IdleLine {
     if (!visible) return;
     const items = gist();
     const now = performance.now();
-    if (now - this.lastRotate >= ROTATE_MS) {
-      this.lastRotate = now;
-      this.index++;
-    }
+    const rot = calcNextRotation(this.index, this.lastRotate, now, ROTATE_MS);
+    this.index = rot.index;
+    this.lastRotate = rot.newLastRotate;
     const item = items[this.index % items.length];
     if (item.key === this.shownKey) {
       // Same item, fresher content (a new Claude step, the clock ticking).
