@@ -119,6 +119,10 @@ export const DEFAULT_SETTINGS: Settings = {
 
 type Listener = () => void;
 
+import { appendTaskStep, toggleIntegrationId, sanitizeSettings } from "./state-utils";
+
+export { appendTaskStep, toggleIntegrationId, sanitizeSettings };
+
 class AppState {
   mode: IslandMode = "hidden";
   view: IslandViewName = "overview";
@@ -162,7 +166,13 @@ class AppState {
 
   /** Marks the UI dirty; the island re-renders on the next frame. */
   notify() {
-    for (const fn of this.listeners) fn();
+    for (const fn of this.listeners) {
+      try {
+        fn();
+      } catch (err) {
+        console.error("[State] Listener error:", err);
+      }
+    }
   }
 
   get focusTask(): AgentTask | null {
@@ -195,9 +205,9 @@ class AppState {
   appendStep(id: string, step: string) {
     const t = this.tasks.find((x) => x.id === id);
     if (!t) return;
-    t.steps.push(step);
-    if (t.steps.length > 20) t.steps.shift();
-    t.stepIndex = t.steps.length - 1;
+    const res = appendTaskStep(t.steps, step, 20);
+    t.steps = res.steps;
+    t.stepIndex = res.stepIndex;
     this.notify();
   }
 
@@ -225,14 +235,11 @@ class AppState {
   }
 
   toggleIntegration(id: string) {
-    if (id === "integration_claude") return;
-    const active = this.settings.activeIntegrations;
-    if (active.includes(id)) {
-      this.settings.activeIntegrations = active.filter((x) => x !== id);
-      if (this.focusId === id) this.focusId = "integration_claude";
-    } else {
-      if (active.length >= 4) return;
-      this.settings.activeIntegrations = [...active, id];
+    const res = toggleIntegrationId(this.settings.activeIntegrations, id, 4);
+    if (!res.changed) return;
+    this.settings.activeIntegrations = res.active;
+    if (this.focusId === id && !res.active.includes(id)) {
+      this.focusId = "integration_claude";
     }
     this.loadIntegrationTasks();
   }
@@ -243,3 +250,4 @@ class AppState {
 }
 
 export const State = new AppState();
+
