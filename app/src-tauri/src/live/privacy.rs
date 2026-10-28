@@ -142,6 +142,26 @@ mod tests {
     }
 
     #[test]
+    fn access_checks() {
+        assert!(is_active_access(1710000000, 0));
+        assert!(!is_active_access(0, 0));
+        assert!(!is_active_access(1710000000, 1710000500));
+        assert!(!is_active_access(0, 1710000500));
+    }
+
+    #[test]
+    fn capitalization_and_delimiters() {
+        assert_eq!(capitalise("hello"), "Hello");
+        assert_eq!(capitalise("  winsle  "), "Winsle");
+        assert_eq!(capitalise(""), "");
+
+        assert_eq!(exe_name("C:/Tools/Terminal/wt.exe"), "Wt");
+        assert_eq!(exe_name("D:\\Apps\\ms-teams.exe"), "Teams");
+        assert_eq!(exe_name("C:\\Windows\\System32\\msedgewebview2.exe"), "Edge");
+        assert_eq!(exe_name("C:#Programs#Discord.EXE"), "Discord");
+    }
+
+    #[test]
     #[ignore]
     fn print_live() {
         println!("PRIVACY: {:?}", snapshot());
