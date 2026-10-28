@@ -63,27 +63,43 @@ export interface ViewLayout {
   agentMode: AgentLayoutMode;
 }
 
+import {
+  LAYOUT_DEFAULTS,
+  calcChatPromptHeight,
+  calcCornerRadius,
+  clampWindowPosition,
+  clampUploadProgress,
+} from "./layout-utils";
+
+export {
+  LAYOUT_DEFAULTS,
+  calcChatPromptHeight,
+  calcCornerRadius,
+  clampWindowPosition,
+  clampUploadProgress,
+};
+
 // The window is a fixed 720×320 (largest view) like the macOS panel; the island is
 // drawn inside it, glued to the top edge and horizontally centred.
-export const PANEL_W = 720;
-export const PANEL_H = 320;
+export const PANEL_W = LAYOUT_DEFAULTS.PANEL_W;
+export const PANEL_H = LAYOUT_DEFAULTS.PANEL_H;
 
 // No notch on a PC: these are the hidden/compact sizes from docs/SPEC.md.
-export const NOTCH_W = 184;
-export const NOTCH_H = 38;
-export const COMPACT_W = 288; // NOTCH_W + 104
+export const NOTCH_W = LAYOUT_DEFAULTS.NOTCH_W;
+export const NOTCH_H = LAYOUT_DEFAULTS.NOTCH_H;
+export const COMPACT_W = LAYOUT_DEFAULTS.COMPACT_W; // NOTCH_W + 104
 /** Compact island while a live activity (song, timer, download…) is shown in it. */
-export const COMPACT_LIVE_W = 420;
+export const COMPACT_LIVE_W = LAYOUT_DEFAULTS.COMPACT_LIVE_W;
 /** Widest the compact island grows (a long lyric line). */
-export const COMPACT_LIVE_MAX_W = 480;
-export const EXPANDED_W = 640;
+export const COMPACT_LIVE_MAX_W = LAYOUT_DEFAULTS.COMPACT_LIVE_MAX_W;
+export const EXPANDED_W = LAYOUT_DEFAULTS.EXPANDED_W;
 
-export const ROUNDED_CORNER = 14; // hidden / compact
-export const EXPANDED_CORNER = 22;
+export const ROUNDED_CORNER = LAYOUT_DEFAULTS.ROUNDED_CORNER; // hidden / compact
+export const EXPANDED_CORNER = LAYOUT_DEFAULTS.EXPANDED_CORNER;
 
 /** Invisible hover strip that wakes the island when hidden. */
-export const WAKE_STRIP_W = 240;
-export const WAKE_STRIP_H = 6;
+export const WAKE_STRIP_W = LAYOUT_DEFAULTS.WAKE_STRIP_W;
+export const WAKE_STRIP_H = LAYOUT_DEFAULTS.WAKE_STRIP_H;
 
 export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   overview: { height: 160, botX: 50, botY: null, botDiameter: 46, agentMode: "pills" },
@@ -127,7 +143,7 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
 
 /** Chat view grows with the conversation — IslandContainer.chatPromptHeight. */
 export function chatPromptHeight(messageCount: number): number {
-  return Math.min(300, 240 + messageCount * 40);
+  return calcChatPromptHeight(messageCount);
 }
 
 export function islandSize(
@@ -165,6 +181,7 @@ export function botPosition(
   islandH: number,
   uploadProgress = 0,
 ): BotPlacement {
+  const safeProgress = clampUploadProgress(uploadProgress);
   switch (mode) {
     case "hidden":
       return { cx: 46, cy: 16, diameter: 6, opacity: 0 };
@@ -174,7 +191,7 @@ export function botPosition(
       const layout = VIEW_LAYOUTS[view];
       if (view === "uploading") {
         return {
-          cx: 36 + uploadProgress * 526,
+          cx: 36 + safeProgress * 526,
           cy: layout.botY ?? 103,
           diameter: layout.botDiameter,
           opacity: 1,
