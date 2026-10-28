@@ -28,87 +28,25 @@ interface HookPayload {
   transcript_path?: string;
 }
 
-const PROJECT_ALIASES: Record<string, string> = {
-  "notch-buddy": "Notch Buddy",
-  notchbuddy: "Notch Buddy",
-  notch_buddy: "Notch Buddy",
+import {
+  PROJECT_ALIASES,
+  aliasProjectName,
+  lastPathComponent,
+  TOOL_LABELS,
+  stepLabel,
+  APPROVAL_FIELDS,
+  approvalTarget,
+} from "./hook-parser";
+
+export {
+  PROJECT_ALIASES,
+  aliasProjectName,
+  lastPathComponent,
+  TOOL_LABELS,
+  stepLabel,
+  APPROVAL_FIELDS,
+  approvalTarget,
 };
-
-function aliasProjectName(name: string): string {
-  return PROJECT_ALIASES[name.toLowerCase()] ?? name;
-}
-
-function lastPathComponent(p: string): string {
-  const cleaned = p.replace(/[\\/]+$/, "");
-  const idx = Math.max(cleaned.lastIndexOf("\\"), cleaned.lastIndexOf("/"));
-  return idx >= 0 ? cleaned.slice(idx + 1) : cleaned;
-}
-
-/** Short verb per Claude Code tool, shown before the file / command. */
-const TOOL_LABELS: Record<string, string> = {
-  Bash: "Run",
-  Read: "Read",
-  Write: "Write",
-  Edit: "Edit",
-  Glob: "Find",
-  Grep: "Search",
-  WebSearch: "Web search",
-  WebFetch: "Fetch",
-  TodoWrite: "Tasks",
-  Task: "Agent",
-  Agent: "Agent",
-  LS: "List",
-  MultiEdit: "Edit",
-  NotebookEdit: "Notebook",
-  PowerShell: "Run",
-  // Antigravity tool names (via the bridge)
-  run_command: "Run",
-  view_file: "Read",
-  write_to_file: "Write",
-  replace_file_content: "Edit",
-};
-
-function stepLabel(tool: string, input: Record<string, unknown>): string {
-  const label = TOOL_LABELS[tool] ?? tool;
-  const str = (k: string) => (typeof input[k] === "string" ? (input[k] as string) : null);
-  const cmd = str("command");
-  if (cmd) return `${label} · ${cmd.slice(0, 40)}`;
-  const path = str("path");
-  if (path) return `${label} · ${lastPathComponent(path)}`;
-  const file = str("file_path");
-  if (file) return `${label} · ${lastPathComponent(file)}`;
-  const query = str("query");
-  if (query) return `${label} · ${query.slice(0, 40)}`;
-  return label;
-}
-
-/**
- * What the Allow button actually authorises. Approving "Write" tells you nothing
- * — approving `Write · C:\…\.env` tells you everything, and the difference is
- * the whole point of approving from the island rather than blind.
- *
- * Ordered by how specific the field is, so an unfamiliar tool still shows
- * whatever identifying string it carries instead of falling back to its name.
- */
-const APPROVAL_FIELDS = [
-  "command", // Bash, PowerShell
-  "file_path", // Write, Edit, MultiEdit, NotebookEdit
-  "path", // Read, LS
-  "url", // WebFetch
-  "query", // WebSearch
-  "pattern", // Glob, Grep
-  "prompt", // Task
-] as const;
-
-function approvalTarget(tool: string, input: Record<string, unknown>): string {
-  for (const field of APPROVAL_FIELDS) {
-    const value = input[field];
-    if (typeof value === "string" && value.trim()) {
-      return `${tool} · ${value.trim()}`;
-    }
-  }
-  return tool;
-}
 
 function upsert(projectName: string, cwd: string) {
   const t = State.tasks.find((x) => x.id === CLAUDE_ID);
