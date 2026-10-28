@@ -2,8 +2,41 @@
  * Utilities for task step bounding, integration toggling, and settings sanitization.
  */
 
-import type { Settings } from "./state";
-import { DEFAULT_SETTINGS } from "./state";
+export interface Settings {
+  soundEnabled: boolean;
+  soundVolume: number;
+  autoCloseInterval: number;
+  absenceInterval: number;
+  activeIntegrations: string[];
+  screen: "primary" | "cursor";
+  autostart: boolean;
+  hooksInstalled: boolean;
+  /** Claude model used by the chat. */
+  model: string;
+  /** Folders watched for growing render outputs. */
+  renderDirs: string[];
+  /** Where quick-capture's inbox.md lives; empty = Documents\Winsle. */
+  captureDir: string;
+  /** Home tiles next to the VS Code card, in order (max 3). */
+  homeWidgets: string[];
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  soundEnabled: true,
+  soundVolume: 0.12,
+  autoCloseInterval: 6,
+  absenceInterval: 180,
+  activeIntegrations: [
+    "integration_resend", "integration_n8n", "integration_vercel", "integration_github",
+  ],
+  screen: "primary",
+  autostart: true,
+  hooksInstalled: false,
+  model: "claude-opus-5",
+  renderDirs: [],
+  captureDir: "",
+  homeWidgets: ["media", "calendar", "integrations"],
+};
 
 /**
  * Sanitizes and bounds task step list to maxSteps entries.
