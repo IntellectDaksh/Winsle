@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(default, rename_all = "camelCase")]
 pub struct Settings {
     pub sound_enabled: bool,
     pub sound_volume: f64,
@@ -219,5 +219,29 @@ mod tests {
         };
         large.sanitize();
         assert_eq!(large.absence_interval, 3600.0);
+    }
+
+    #[test]
+    fn test_load_from_bytes_corrupted_fallback() {
+        let corrupt = b"not a json document at all {]][";
+        let loaded = load_from_bytes(corrupt);
+        assert_eq!(loaded.sound_volume, 0.12);
+        assert_eq!(loaded.screen, "primary");
+        assert_eq!(loaded.auto_close_interval, 6.0);
+    }
+
+    #[test]
+    fn test_from_json_str_and_deduplication() {
+        let raw = r#"{
+            "soundVolume": 0.5,
+            "renderDirs": ["C:\\Videos", "   ", "C:\\Videos", "D:\\Renders"],
+            "activeIntegrations": ["github", "", "github", "resend"],
+            "captureDir": "  E:\\Notes  "
+        }"#;
+        let s = from_json_str(raw);
+        assert_eq!(s.sound_volume, 0.5);
+        assert_eq!(s.render_dirs, vec!["C:\\Videos", "D:\\Renders"]);
+        assert_eq!(s.active_integrations, vec!["github", "resend"]);
+        assert_eq!(s.capture_dir, "E:\\Notes");
     }
 }
