@@ -44,7 +44,7 @@ fn file() -> PathBuf {
 
 // Civil date <-> day number (Howard Hinnant's algorithm), so "N days ago"
 // needs no date crate.
-fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+pub(crate) fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = y.div_euclid(400);
     let yoe = y - era * 400;
@@ -86,8 +86,12 @@ fn merge(into: &mut Days, from: Days) {
     }
 }
 
-fn friendly(stem: &str) -> Option<String> {
-    let name = match stem.to_ascii_lowercase().as_str() {
+pub(crate) fn friendly(stem: &str) -> Option<String> {
+    let s = stem.trim();
+    if s.is_empty() {
+        return None;
+    }
+    let name = match s.to_ascii_lowercase().as_str() {
         "winsle" | "applicationframehost" | "lockapp" | "logonui" | "searchhost" | "shellexperiencehost"
         | "startmenuexperiencehost" | "textinputhost" => return None,
         "chrome" => "Chrome",
@@ -105,7 +109,9 @@ fn friendly(stem: &str) -> Option<String> {
         "figma" => "Figma",
         "whatsapp" => "WhatsApp",
         "notion" => "Notion",
-        _ => stem,
+        "slack" => "Slack",
+        "obs64" => "OBS Studio",
+        _ => s,
     };
     Some(name.to_string())
 }
@@ -204,19 +210,23 @@ pub fn usage_days(days: u32) -> Vec<DayUsage> {
     day_totals(&STATE.lock().unwrap_or_else(|e| e.into_inner()), today_num(), days)
 }
 
-/// Per-app seconds summed over the last `days` days, biggest first.
-#[tauri::command]
-pub fn usage_top(days: u32) -> Vec<AppUsage> {
-    let oldest = civil(today_num() - days.clamp(1, KEEP_DAYS as u32) as i64 + 1);
+pub(crate) fn aggregate_top_apps(days: &Days, oldest_day: &str) -> Vec<AppUsage> {
     let mut sum: BTreeMap<String, u64> = BTreeMap::new();
-    for (_, apps) in STATE.lock().unwrap_or_else(|e| e.into_inner()).range(oldest..) {
+    for (_, apps) in days.range(oldest_day.to_string()..) {
         for (n, s) in apps {
             *sum.entry(n.clone()).or_default() += s;
         }
     }
     let mut v: Vec<AppUsage> = sum.into_iter().map(|(name, secs)| AppUsage { name, secs }).collect();
-    v.sort_by(|a, b| b.secs.cmp(&a.secs));
+    v.sort_by(|a, b| b.secs.cmp(&a.secs).then_with(|| a.name.cmp(&b.name)));
     v
+}
+
+/// Per-app seconds summed over the last `days` days, biggest first.
+#[tauri::command]
+pub fn usage_top(days: u32) -> Vec<AppUsage> {
+    let oldest = civil(today_num() - days.clamp(1, KEEP_DAYS as u32) as i64 + 1);
+    aggregate_top_apps(&STATE.lock().unwrap_or_else(|e| e.into_inner()), &oldest)
 }
 
 #[cfg(test)]
