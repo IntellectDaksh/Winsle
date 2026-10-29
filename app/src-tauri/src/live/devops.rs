@@ -283,3 +283,68 @@ pub async fn devops_run(path: String, task: String) -> Result<DevopsRunResult, S
     .await
     .map_err(|e| e.to_string())?
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rejects_missing_or_non_directory_paths() {
+        assert!(checked_dir("").is_err());
+        assert!(checked_dir("   ").is_err());
+        assert!(checked_dir("nonexistent-folder-xyz-123456").is_err());
+    }
+
+    #[test]
+    fn test_task_detection_from_package_json_and_cargo() {
+        let dir = std::env::temp_dir().join(format!(
+            "winsle-devops-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // 1. package.json with mixed scripts
+        std::fs::write(
+            dir.join("package.json"),
+            r#"{"scripts":{"build":"vite build","test":"vitest","deploy":"dangerous-cmd","lint":"eslint ."}}"#,
+        )
+        .unwrap();
+
+        let tasks = tasks_for(&dir);
+        assert!(tasks.contains(&"npm:build".to_string()));
+        assert!(tasks.contains(&"npm:test".to_string()));
+        assert!(tasks.contains(&"npm:lint".to_string()));
+        // deploy is not in allowlisted TASK_IDS
+        assert!(!tasks.contains(&"npm:deploy".to_string()));
+
+        // 2. Add Cargo.toml
+        std::fs::write(dir.join("Cargo.toml"), "[package]\nname = \"demo\"\n").unwrap();
+        let cargo_tasks = tasks_for(&dir);
+        assert!(cargo_tasks.contains(&"cargo:check".to_string()));
+        assert!(cargo_tasks.contains(&"cargo:build".to_string()));
+        assert!(cargo_tasks.contains(&"cargo:test".to_string()));
+
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn test_read_tail_and_text_output_bounds() {
+        // Small input
+        let small = b"Hello world log";
+        assert_eq!(text_output(small), "Hello world log");
+
+        // Cursor read tail
+        let mut cursor = std::io::Cursor::new(b"line 1\nline 2\nline 3");
+        let bytes = read_tail(&mut cursor);
+        assert_eq!(bytes, b"line 1\nline 2\nline 3");
+
+        // Timeout constants are reasonable
+        assert_eq!(STATUS_TIMEOUT, Duration::from_secs(10));
+        assert_eq!(RUN_TIMEOUT, Duration::from_secs(120));
+        assert_eq!(MAX_LOG_BYTES, 128 * 1024);
+    }
+}
