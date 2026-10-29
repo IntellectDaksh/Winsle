@@ -355,6 +355,21 @@ mod tests {
     }
 
     #[test]
+    fn test_media_action_and_seek() {
+        assert_eq!(parse_media_action("play_pause").unwrap(), "play_pause");
+        assert_eq!(parse_media_action("  TOGGLE  ").unwrap(), "play_pause");
+        assert_eq!(parse_media_action("skip").unwrap(), "next");
+        assert_eq!(parse_media_action("previous").unwrap(), "prev");
+        assert!(parse_media_action("rewind").is_err());
+
+        assert_eq!(clamp_seek_position(10.0, Some(100.0)).unwrap(), 10.0);
+        assert_eq!(clamp_seek_position(120.0, Some(100.0)).unwrap(), 100.0);
+        assert_eq!(clamp_seek_position(50.0, None).unwrap(), 50.0);
+        assert!(clamp_seek_position(-1.0, Some(100.0)).is_err());
+        assert!(clamp_seek_position(f64::NAN, Some(100.0)).is_err());
+    }
+
+    #[test]
     #[ignore]
     fn print_live() {
         unsafe {
