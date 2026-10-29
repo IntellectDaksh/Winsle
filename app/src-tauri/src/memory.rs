@@ -197,3 +197,86 @@ pub fn memory_clear() -> Result<(), String> {
     if p.exists() { std::fs::remove_file(p).map_err(|e| e.to_string())?; }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memory_extension_eligibility_and_exclusions() {
+        assert!(EXTENSIONS.contains(&"md"));
+        assert!(EXTENSIONS.contains(&"txt"));
+        assert!(EXTENSIONS.contains(&"json"));
+        assert!(EXTENSIONS.contains(&"rs"));
+        assert!(EXTENSIONS.contains(&"ts"));
+        assert!(EXTENSIONS.contains(&"py"));
+
+        // Reject executables and binary formats
+        assert!(!EXTENSIONS.contains(&"exe"));
+        assert!(!EXTENSIONS.contains(&"dll"));
+        assert!(!EXTENSIONS.contains(&"so"));
+        assert!(!EXTENSIONS.contains(&"bin"));
+
+        // Non-existent path returns false
+        assert!(!eligible(Path::new("missing-file.md")));
+    }
+
+    #[test]
+    fn test_skip_dirs_and_skip_files() {
+        assert!(SKIP_DIRS.contains(&".git"));
+        assert!(SKIP_DIRS.contains(&"node_modules"));
+        assert!(SKIP_DIRS.contains(&"target"));
+        assert!(SKIP_DIRS.contains(&".venv"));
+
+        assert!(SKIP_FILES.contains(&"credentials.json"));
+        assert!(SKIP_FILES.contains(&"secrets.json"));
+        assert!(SKIP_FILES.contains(&"token.json"));
+    }
+
+    #[test]
+    fn test_sqlite_fts5_search_indexing() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE VIRTUAL TABLE docs USING fts5(source_id UNINDEXED, path UNINDEXED, title, body);",
+        )
+        .unwrap();
+
+        db.execute(
+            "INSERT INTO docs(source_id, path, title, body) VALUES (1, ?1, 'architecture.md', 'Winsle uses a SQLite full-text search index for private memory queries')",
+            ["C:\\Projects\\Winsle\\architecture.md"],
+        )
+        .unwrap();
+
+        let (path, excerpt): (String, String) = db
+            .query_row(
+                "SELECT path, snippet(docs, 3, '', '', ' … ', 24) FROM docs WHERE docs MATCH ?1",
+                ["\"SQLite\""],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+
+        assert_eq!(path, "C:\\Projects\\Winsle\\architecture.md");
+        assert!(excerpt.contains("SQLite"));
+    }
+
+    #[test]
+    fn test_gather_skips_secrets_and_hidden_files() {
+        let root = std::env::temp_dir().join(format!(
+            "winsle-mem-unit-{}-{}",
+            std::process::id(),
+            now()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+
+        std::fs::write(root.join("readme.md"), "# Hello Winsle").unwrap();
+        std::fs::write(root.join("credentials.json"), "secret").unwrap();
+        std::fs::write(root.join(".hidden.txt"), "secret").unwrap();
+
+        let (found, skipped) = gather(&root);
+        assert_eq!(found.len(), 1);
+        assert!(found[0].ends_with("readme.md"));
+        assert_eq!(skipped, 2);
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
