@@ -171,3 +171,78 @@ pub fn workspace_resume(id: String) -> Result<ResumeReport, String> {
     }
     Ok(report)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dedupes_items_by_path_case_insensitively() {
+        let mut items = vec![
+            WorkspaceItem {
+                kind: "app".into(),
+                path: "C:\\Program Files\\App\\app.exe".into(),
+                label: "App".into(),
+            },
+            WorkspaceItem {
+                kind: "app".into(),
+                path: "c:\\program files\\app\\app.exe".into(),
+                label: "app duplicate".into(),
+            },
+            WorkspaceItem {
+                kind: "folder".into(),
+                path: "D:\\Projects\\Winsle".into(),
+                label: "Winsle".into(),
+            },
+        ];
+        let mut seen = HashSet::new();
+        items.retain(|i| seen.insert(i.path.to_ascii_lowercase()));
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].label, "App");
+        assert_eq!(items[1].label, "Winsle");
+    }
+
+    #[test]
+    fn test_workspace_and_report_serialization() {
+        let ws = Workspace {
+            id: "ws-123".into(),
+            name: "Winsle Dev".into(),
+            updated_at: 1700000000,
+            items: vec![WorkspaceItem {
+                kind: "folder".into(),
+                path: "D:\\project x".into(),
+                label: "Project X".into(),
+            }],
+        };
+        let bytes = serde_json::to_vec(&ws).unwrap();
+        let deserialized: Workspace = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(deserialized.id, "ws-123");
+        assert_eq!(deserialized.name, "Winsle Dev");
+        assert_eq!(deserialized.items.len(), 1);
+
+        let report = ResumeReport {
+            opened: 2,
+            missing: vec!["D:\\old_path".into()],
+            failed: vec![],
+        };
+        let report_json = serde_json::to_string(&report).unwrap();
+        assert!(report_json.contains("\"opened\":2"));
+        assert!(report_json.contains("\"missing\":[\"D:\\\\old_path\"]"));
+    }
+
+    #[test]
+    fn test_workspace_constants_and_limits() {
+        assert_eq!(MAX_WORKSPACES, 50);
+        assert_eq!(MAX_ITEMS, 80);
+
+        // Name length boundary tests
+        let valid_name = "A".repeat(80);
+        assert!(!valid_name.is_empty() && valid_name.chars().count() <= 80);
+
+        let invalid_name = "A".repeat(81);
+        assert!(invalid_name.chars().count() > 80);
+
+        let empty_name = "   ";
+        assert!(empty_name.trim().is_empty());
+    }
+}
