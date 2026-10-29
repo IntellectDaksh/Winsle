@@ -2,8 +2,8 @@
  * Color math, eye shapes, and state configuration utilities for Mochi.
  */
 
-import { lerp } from "../core/anim";
-import type { BotEmoteName, BotStateName } from "../core/layout";
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+import type { BotEmoteName, BotStateName } from "../core/layout.js";
 
 export type EyeShape =
   | "pill" | "wide" | "dot" | "line" | "flat" | "happy" | "closed"
