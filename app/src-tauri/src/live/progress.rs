@@ -61,15 +61,32 @@ fn strip_partial(name: &str) -> Option<&str> {
         .map(|s| &name[..name.len() - s.len()])
 }
 
-fn is_temp(name: &str) -> bool {
+pub(crate) fn is_temp(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     lower == "desktop.ini" || lower.starts_with("~$") || lower.starts_with('.') || lower.ends_with(".tmp")
 }
 
-fn is_render_file(name: &str) -> bool {
+pub(crate) fn is_render_file(name: &str) -> bool {
     name.rsplit_once('.')
         .map(|(_, ext)| RENDER_EXTS.contains(&ext.to_ascii_lowercase().as_str()))
         .unwrap_or(false)
+}
+
+pub fn calc_growth_rate(prev_bytes: u64, current_bytes: u64, dt: f64) -> f64 {
+    if !dt.is_finite() || dt <= 0.0 {
+        return 0.0;
+    }
+    let diff = current_bytes.saturating_sub(prev_bytes);
+    diff as f64 / dt
+}
+
+pub fn smooth_speed(current_speed: f64, instant_rate: f64, alpha: f64) -> f64 {
+    if current_speed <= 0.0 {
+        instant_rate
+    } else {
+        let a = alpha.clamp(0.0, 1.0);
+        a * instant_rate + (1.0 - a) * current_speed
+    }
 }
 
 #[derive(Clone)]
@@ -159,8 +176,8 @@ impl Tracker {
             }
             if let Some(t) = self.tracks.get_mut(path) {
                 if c.size != t.bytes {
-                    let inst = c.size.saturating_sub(t.bytes) as f64 / dt;
-                    t.speed = if t.speed == 0.0 { inst } else { 0.3 * inst + 0.7 * t.speed };
+                    let inst = calc_growth_rate(t.bytes, c.size, dt);
+                    t.speed = smooth_speed(t.speed, inst, 0.3);
                     t.bytes = c.size;
                     t.last_change = now;
                     changed = true;
