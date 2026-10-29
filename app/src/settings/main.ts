@@ -11,6 +11,7 @@ import { prefs, save as savePref, setPrefs } from "../live/prefs";
 import { calendarAccountRows } from "../live/calendar-actions";
 import { voiceSection } from "../live/voice";
 import { phoneSection } from "./phone";
+import { notificationInboxSection, extensionsSection } from "./feature_hub";
 import { guardPrefs, parseList, setGuardPrefs } from "../live/coach";
 import { spotifySettingsRow } from "../live/spotify";
 
@@ -651,6 +652,8 @@ async function main() {
     habitsSection(),
     h("section", {}, h("h2", {}, h("span", { text: "Voice" })), voiceSection()),
     phoneSection(),
+    notificationInboxSection(),
+    extensionsSection(),
     focusSection(),
     generalSection(),
     h("div", {

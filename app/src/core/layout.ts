@@ -36,7 +36,12 @@ export type IslandViewName =
   | "usage"
   | "today"
   | "more"
-  | "agent";
+  | "agent"
+  | "workspaces"
+  | "memory"
+  | "vision"
+  | "production"
+  | "devops";
 
 export type BotStateName =
   | "idle"
@@ -133,7 +138,12 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   palette: { height: 262, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
   usage: { height: 212, botX: 44, botY: 74, botDiameter: 34, agentMode: "none" },
   agent: { height: 262, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
-  more: { height: 196, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
+  workspaces: { height: 300, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
+  memory: { height: 300, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
+  vision: { height: 300, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
+  production: { height: 300, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
+  devops: { height: 300, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
+  more: { height: 300, botX: 44, botY: 70, botDiameter: 30, agentMode: "none" },
   today: { height: 240, botX: 44, botY: 74, botDiameter: 34, agentMode: "none" },
 };
 
