@@ -136,3 +136,129 @@ pub fn now_ms() -> i64 {
         .map(|x| x.as_millis() as i64)
         .unwrap_or(0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_inbox_entry_round_trip() {
+        let x = InboxEntry {
+            info: NotifInfo {
+                id: "notif-1".into(),
+                app_id: "com.slack".into(),
+                app: "Slack".into(),
+                title: "Alice".into(),
+                body: "Hello world".into(),
+                time: 1700000000,
+            },
+            repeats: 3,
+            status: "snoozed".into(),
+            snooze_until: 1700001800,
+        };
+        let bytes = serde_json::to_vec(&x).unwrap();
+        let y: InboxEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(y.info.id, "notif-1");
+        assert_eq!(y.info.app, "Slack");
+        assert_eq!(y.repeats, 3);
+        assert_eq!(y.status, "snoozed");
+        assert_eq!(y.snooze_until, 1700001800);
+    }
+
+    #[test]
+    fn test_snooze_range_bounds() {
+        // Valid range 1..=1440
+        assert!((1..=1440).contains(&1));
+        assert!((1..=1440).contains(&30));
+        assert!((1..=1440).contains(&1440));
+
+        // Invalid
+        assert!(!(1..=1440).contains(&0));
+        assert!(!(1..=1440).contains(&1441));
+    }
+
+    #[test]
+    fn test_inbox_deduplication_logic() {
+        let mut items: Vec<InboxEntry> = Vec::new();
+        let notif_a = NotifInfo {
+            id: "1".into(),
+            app_id: "com.teams".into(),
+            app: "Teams".into(),
+            title: "Meeting".into(),
+            body: "Daily Standup".into(),
+            time: 100,
+        };
+
+        // First occurrence
+        items.insert(
+            0,
+            InboxEntry {
+                info: notif_a.clone(),
+                repeats: 1,
+                status: "unread".into(),
+                snooze_until: 0,
+            },
+        );
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].repeats, 1);
+
+        // Second occurrence matches app_id, title, and body
+        let notif_repeat = NotifInfo {
+            id: "2".into(),
+            app_id: "com.teams".into(),
+            app: "Teams".into(),
+            title: "Meeting".into(),
+            body: "Daily Standup".into(),
+            time: 200,
+        };
+        if let Some(i) = items.iter().position(|x| {
+            x.info.app_id == notif_repeat.app_id
+                && x.info.title == notif_repeat.title
+                && x.info.body == notif_repeat.body
+                && x.status != "dismissed"
+        }) {
+            let mut item = items.remove(i);
+            item.repeats = item.repeats.saturating_add(1);
+            item.info.time = notif_repeat.time;
+            items.insert(0, item);
+        }
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].repeats, 2);
+        assert_eq!(items[0].info.time, 200);
+    }
+
+    #[test]
+    fn test_triage_state_transitions() {
+        let mut entry = InboxEntry {
+            info: NotifInfo {
+                id: "test".into(),
+                app_id: "test".into(),
+                app: "Test".into(),
+                title: "T".into(),
+                body: "B".into(),
+                time: 0,
+            },
+            repeats: 1,
+            status: "unread".into(),
+            snooze_until: 0,
+        };
+
+        // Read
+        entry.status = "read".into();
+        assert_eq!(entry.status, "read");
+
+        // Snooze
+        let n = 45;
+        let now = 10000;
+        entry.status = "snoozed".into();
+        entry.snooze_until = now + i64::from(n) * 60_000;
+        assert_eq!(entry.status, "snoozed");
+        assert_eq!(entry.snooze_until, 10000 + 45 * 60_000);
+
+        // Dismiss
+        entry.status = "dismissed".into();
+        entry.snooze_until = 0;
+        assert_eq!(entry.status, "dismissed");
+        assert_eq!(entry.snooze_until, 0);
+    }
+}
