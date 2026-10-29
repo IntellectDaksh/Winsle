@@ -172,3 +172,39 @@ pub async fn vision_read_selection() -> Result<VisionResult, String> {
         result
     }).await.map_err(|e| e.to_string())?
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_scaled_dimensions_within_bounds() {
+        let (w, h, bytes) = calculate_scaled_dimensions(800, 600, 2600).expect("should succeed");
+        assert_eq!(w, 800);
+        assert_eq!(h, 600);
+        assert_eq!(bytes, 800 * 600 * 4);
+    }
+
+    #[test]
+    fn test_calculate_scaled_dimensions_downscaling() {
+        let (w, h, bytes) = calculate_scaled_dimensions(4000, 2000, 2000).expect("should downscale");
+        assert_eq!(w, 2000);
+        assert_eq!(h, 1000);
+        assert_eq!(bytes, 2000 * 1000 * 4);
+    }
+
+    #[test]
+    fn test_calculate_scaled_dimensions_rejects_sub_min() {
+        assert!(calculate_scaled_dimensions(1, 100, 2000).is_err());
+        assert!(calculate_scaled_dimensions(100, 1, 2000).is_err());
+        assert!(calculate_scaled_dimensions(0, 0, 2000).is_err());
+        assert!(calculate_scaled_dimensions(-10, 50, 2000).is_err());
+    }
+
+    #[test]
+    fn test_calculate_scaled_dimensions_rejects_oversized_allocation() {
+        // 10000 x 10000 with max_dim 10000 would be 10000 * 10000 * 4 = 400 MB > MAX_IMAGE_BYTES (64 MB)
+        let err = calculate_scaled_dimensions(10000, 10000, 10000).unwrap_err();
+        assert!(err.contains("too large"));
+    }
+}
