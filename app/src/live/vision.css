@@ -1,0 +1,13 @@
+.vision-view .lv-body { gap: 8px; padding-top: 2px; }
+.vision-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vision-head strong { font-size: 13px; font-weight: 650; white-space: nowrap; }
+.vision-source { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; font-size: 11px; }
+.vision-head .btn { flex: 0 0 auto; }
+.vision-capture { display: flex; flex-wrap: wrap; gap: 6px; }
+.vision-status, .vision-privacy { font-size: 11px; color: var(--dim); line-height: 1.4; }
+.vision-result { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; overflow: auto; min-height: 58px; max-height: 96px; font: 11px/1.45 var(--mono); background: #1d2024; border-radius: 8px; padding: 8px; }
+.vision-result.empty { color: var(--dim); }
+.vision-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.vision-actions[hidden] { display: none; }
+.vision-answer { font-size: 11px; line-height: 1.4; max-height: 55px; overflow: auto; color: var(--ink-2); user-select: text; }
+.vision-privacy { margin-top: auto; }

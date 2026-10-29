@@ -127,6 +127,9 @@ export const Bridge = {
   /** Ghost mode: the window ignores the mouse entirely. */
   setLocked: (locked: boolean) => call<void>("set_locked", { locked }),
   pickColor: () => call<ColorInfo | null>("pick_color"),
+  /** Explicit, in-memory OCR of the app that was in front of Winsle. */
+  visionRead: () => callOrThrow<{ windowTitle: string; text: string; width: number; height: number }>("vision_read"),
+  visionReadSelection: () => callOrThrow<{ windowTitle: string; text: string; width: number; height: number }>("vision_read_selection"),
   aiStatus: () => call<{ running: boolean; installed: boolean; models: string[] }>("ai_status"),
   aiStart: () => callOrThrow<boolean>("ai_start"),
   /** Local Ollama chat turn; rejects with a readable message. */
