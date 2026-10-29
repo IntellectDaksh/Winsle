@@ -63,5 +63,8 @@ windows = { version = "0.61", features = [
   "Win32_NetworkManagement_Ndis",
   "Win32_Networking_WinSock",
   "Win32_Graphics_Gdi",
+  "Graphics_Imaging",
+  "Media_Ocr",
+  "Win32_System_WinRT",
   "Win32_System_Shutdown",
 ] }

@@ -21,6 +21,7 @@ pub mod extensions;
 pub mod phone;
 pub mod production;
 pub mod devops;
+pub mod vision;
 pub mod privacy;
 pub mod progress;
 pub mod spotify;

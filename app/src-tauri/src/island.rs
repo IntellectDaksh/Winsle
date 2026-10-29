@@ -413,6 +413,22 @@ pub fn force_foreground(win: &WebviewWindow) {
 /// The app that was in front before the island took the keyboard.
 static PREV_FOREGROUND: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
 
+/// The last application window, even while the island has keyboard focus.
+pub fn foreground_target(win: &WebviewWindow) -> Option<HWND> {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, IsWindow};
+    let self_hwnd = win.hwnd().ok()?;
+    let me = HWND(self_hwnd.0);
+    unsafe {
+        let active = GetForegroundWindow();
+        let candidate = if active == me {
+            HWND(PREV_FOREGROUND.load(std::sync::atomic::Ordering::Relaxed) as *mut core::ffi::c_void)
+        } else {
+            active
+        };
+        (!candidate.is_invalid() && candidate != me && IsWindow(Some(candidate)).as_bool()).then_some(candidate)
+    }
+}
+
 /// Hands the keyboard back to whatever was in front before `force_foreground`,
 /// so typing after the palette or quick capture closes lands where it should.
 pub fn restore_foreground(win: &WebviewWindow) {
