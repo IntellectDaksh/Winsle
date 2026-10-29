@@ -8,13 +8,13 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use rusqlite::{Connection, OpenFlags};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const POLL: Duration = Duration::from_secs(2);
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct NotifInfo {
     pub id: String,
@@ -140,6 +140,7 @@ pub fn spawn(app: AppHandle) {
                     continue;
                 }
                 if let Some(info) = to_info(row) {
+                    super::notif_inbox::record(info.clone());
                     crate::live::emit(&app, "live-notif", info);
                 }
             }
