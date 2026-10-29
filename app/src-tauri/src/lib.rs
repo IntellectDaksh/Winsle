@@ -13,6 +13,7 @@ mod live;
 mod tray;
 mod updater;
 mod win_user;
+mod workspaces;
 
 use std::os::windows::process::CommandExt;
 use std::process::Command;
