@@ -72,6 +72,11 @@ pub fn is_browser(exe: &str) -> bool {
     BROWSERS.contains(&norm.as_str())
 }
 
+/// Strips control characters and zero-width spaces from window titles before matching.
+pub fn sanitize_window_title(title: &str) -> String {
+    title.chars().filter(|c| !c.is_control() && *c != '\u{200b}').collect()
+}
+
 /// Which block-list entry the foreground window hits, if any. `exe` is the
 /// image stem ("chrome"); site keywords only apply to browser windows.
 pub fn matches(apps: &[String], sites: &[String], exe: &str, title: &str) -> Option<String> {
@@ -82,7 +87,7 @@ pub fn matches(apps: &[String], sites: &[String], exe: &str, title: &str) -> Opt
     if !is_browser(&exe) {
         return None;
     }
-    let title = title.to_lowercase();
+    let cleaned_title = sanitize_window_title(title).to_lowercase();
     sites
         .iter()
         .map(|s| s.trim())
@@ -90,8 +95,8 @@ pub fn matches(apps: &[String], sites: &[String], exe: &str, title: &str) -> Opt
             let (raw, stem) = site_keyword_stems(s);
             let raw_lower = raw.to_lowercase();
             let stem_lower = stem.to_lowercase();
-            (!raw_lower.is_empty() && title.contains(&raw_lower))
-                || (!stem_lower.is_empty() && title.contains(&stem_lower))
+            (!raw_lower.is_empty() && cleaned_title.contains(&raw_lower))
+                || (!stem_lower.is_empty() && cleaned_title.contains(&stem_lower))
         })
         .map(str::to_string)
 }
@@ -192,14 +197,9 @@ pub fn distract_days(days: u32) -> Vec<DayUsage> {
         .collect()
 }
 
-/// Top distractions over the last `days` days.
-#[tauri::command]
-pub fn distract_top(days: u32) -> Vec<AppUsage> {
-    let mut g = DISTRACT.lock().unwrap_or_else(|e| e.into_inner());
-    let d = g.get_or_insert_with(|| std::fs::read_to_string(file()).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default());
-    let oldest = civil(today_num() - days.clamp(1, KEEP_DAYS as u32) as i64 + 1);
+pub fn aggregate_distractions(days: &BTreeMap<String, BTreeMap<String, u64>>, oldest: &str) -> Vec<AppUsage> {
     let mut sum: BTreeMap<String, u64> = BTreeMap::new();
-    for (_, apps) in d.range(oldest..) {
+    for (_, apps) in days.range(oldest.to_string()..) {
         for (n, s) in apps {
             *sum.entry(n.clone()).or_default() += s;
         }
@@ -207,6 +207,15 @@ pub fn distract_top(days: u32) -> Vec<AppUsage> {
     let mut v: Vec<AppUsage> = sum.into_iter().map(|(name, secs)| AppUsage { name, secs }).collect();
     v.sort_by(|a, b| b.secs.cmp(&a.secs));
     v
+}
+
+/// Top distractions over the last `days` days.
+#[tauri::command]
+pub fn distract_top(days: u32) -> Vec<AppUsage> {
+    let mut g = DISTRACT.lock().unwrap_or_else(|e| e.into_inner());
+    let d = g.get_or_insert_with(|| std::fs::read_to_string(file()).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default());
+    let oldest = civil(today_num() - days.clamp(1, KEEP_DAYS as u32) as i64 + 1);
+    aggregate_distractions(d, &oldest)
 }
 
 #[cfg(test)]
