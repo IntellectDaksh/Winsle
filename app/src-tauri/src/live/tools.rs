@@ -193,13 +193,25 @@ pub fn pick_color() -> Option<ColorInfo> {
     }
 }
 
+pub fn sanitize_target_uri(target: &str) -> Result<String, String> {
+    let trimmed = target.trim();
+    if trimmed.is_empty() {
+        return Err("target is empty".into());
+    }
+    if trimmed.chars().any(|c| c.is_control() || c == '\0') {
+        return Err("target contains control characters".into());
+    }
+    Ok(trimmed.to_string())
+}
+
 /// ShellExecuteW "open"; no cmd.exe in between.
 fn shell_execute(target: &str) -> Result<(), String> {
+    let clean = sanitize_target_uri(target)?;
     let r = unsafe {
-        ShellExecuteW(None, &HSTRING::from("open"), &HSTRING::from(target), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL)
+        ShellExecuteW(None, &HSTRING::from("open"), &HSTRING::from(&clean), PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL)
     };
     // Values above 32 mean success.
-    if r.0 as usize > 32 { Ok(()) } else { Err(format!("could not open {target}")) }
+    if r.0 as usize > 32 { Ok(()) } else { Err(format!("could not open {clean}")) }
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -277,14 +289,21 @@ pub fn app_launch(path: String) -> Result<(), String> {
     shell_execute(&path)
 }
 
+pub fn system_action_target(action: &str) -> Result<Option<&'static str>, String> {
+    match action.trim().to_ascii_lowercase().as_str() {
+        "lock" => Ok(None),
+        "snip" => Ok(Some("ms-screenclip:")),
+        "settings" => Ok(Some("ms-settings:")),
+        "taskmgr" => Ok(Some("taskmgr.exe")),
+        _ => Err("unknown action".into()),
+    }
+}
+
 #[tauri::command]
 pub fn system_action(action: String) -> Result<(), String> {
-    match action.as_str() {
-        "lock" => unsafe { LockWorkStation() }.map_err(|e| e.to_string()),
-        "snip" => shell_execute("ms-screenclip:"),
-        "settings" => shell_execute("ms-settings:"),
-        "taskmgr" => shell_execute("taskmgr.exe"),
-        _ => Err("unknown action".into()),
+    match system_action_target(&action)? {
+        None => unsafe { LockWorkStation() }.map_err(|e| e.to_string()),
+        Some(target) => shell_execute(target),
     }
 }
 
