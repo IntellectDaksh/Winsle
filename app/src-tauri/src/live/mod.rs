@@ -16,6 +16,7 @@ pub mod focus_guard;
 pub mod lyrics;
 pub mod media;
 pub mod notifs;
+pub mod extensions;
 pub mod phone;
 pub mod privacy;
 pub mod progress;
