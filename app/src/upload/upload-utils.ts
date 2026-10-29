@@ -110,8 +110,10 @@ export function calcSuckStripParams(
  */
 export function calcSuckWobble(suck: number): number {
   const clampedSuck = Math.max(0, Math.min(1, Number.isFinite(suck) ? suck : 0));
+  if (clampedSuck === 0 || clampedSuck === 1) return 0;
   const p = eIn(clampedSuck);
-  return Math.sin(clampedSuck * Math.PI * 2) * 0.1 * (1 - p);
+  const w = Math.sin(clampedSuck * Math.PI * 2) * 0.1 * (1 - p);
+  return Object.is(w, -0) ? 0 : w;
 }
 
 /**
