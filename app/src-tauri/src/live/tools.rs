@@ -358,4 +358,21 @@ mod tests {
         let v = tidy_apps(vec![e("zed"), e("Uninstall Foo"), e("Alpha"), e("alpha")]);
         assert_eq!(v.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["Alpha", "zed"]);
     }
+
+    #[test]
+    fn test_uri_sanitizer_and_system_actions() {
+        assert_eq!(sanitize_target_uri("https://example.com").unwrap(), "https://example.com");
+        assert_eq!(sanitize_target_uri("  ms-settings:  ").unwrap(), "ms-settings:");
+        assert!(sanitize_target_uri("").is_err());
+        assert!(sanitize_target_uri("   ").is_err());
+        assert!(sanitize_target_uri("target\0with_null").is_err());
+        assert!(sanitize_target_uri("target\nwith_newline").is_err());
+
+        assert_eq!(system_action_target("lock").unwrap(), None);
+        assert_eq!(system_action_target("  LOCK  ").unwrap(), None);
+        assert_eq!(system_action_target("snip").unwrap(), Some("ms-screenclip:"));
+        assert_eq!(system_action_target("settings").unwrap(), Some("ms-settings:"));
+        assert_eq!(system_action_target("taskmgr").unwrap(), Some("taskmgr.exe"));
+        assert!(system_action_target("reboot").is_err());
+    }
 }
