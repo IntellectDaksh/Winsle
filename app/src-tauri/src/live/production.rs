@@ -194,3 +194,91 @@ pub async fn production_scan(app: AppHandle) -> Result<ProductionInventory, Stri
         .await
         .map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_group_version_patterns() {
+        // v-prefix patterns with separators
+        assert_eq!(group_version("Scene_v003.mp4"), ("Scene".into(), Some(3)));
+        assert_eq!(group_version("Edit-v12.mov"), ("Edit".into(), Some(12)));
+        assert_eq!(group_version("clip.v1.mxf"), ("clip".into(), Some(1)));
+        assert_eq!(group_version("Reel v5.avi"), ("Reel".into(), Some(5)));
+
+        // version-word patterns
+        assert_eq!(
+            group_version("Final-version04.m4v"),
+            ("Final".into(), Some(4))
+        );
+        assert_eq!(
+            group_version("render_version2.webm"),
+            ("render".into(), Some(2))
+        );
+
+        // Unversioned or non-matching suffixes
+        assert_eq!(group_version("take2019.mp4"), ("take2019".into(), None));
+        assert_eq!(group_version("master_audio.wav"), ("master_audio".into(), None));
+        assert_eq!(group_version("v1.mov"), ("v1".into(), None));
+    }
+
+    #[test]
+    fn test_output_and_temp_extension_filters() {
+        assert!(OUTPUT_EXTS.contains(&"mp4"));
+        assert!(OUTPUT_EXTS.contains(&"mov"));
+        assert!(OUTPUT_EXTS.contains(&"mxf"));
+        assert!(OUTPUT_EXTS.contains(&"wav"));
+        assert!(OUTPUT_EXTS.contains(&"exr"));
+        assert!(OUTPUT_EXTS.contains(&"png"));
+
+        assert!(TEMP_EXTS.contains(&"part"));
+        assert!(TEMP_EXTS.contains(&"partial"));
+        assert!(TEMP_EXTS.contains(&"tmp"));
+
+        assert!(!OUTPUT_EXTS.contains(&"exe"));
+        assert!(!OUTPUT_EXTS.contains(&"bat"));
+    }
+
+    #[test]
+    fn test_inventory_state_mapping_and_temp_handling() {
+        let dir = std::env::temp_dir().join(format!(
+            "winsle-prod-test-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // 1. Empty output file (0 bytes) -> state = empty
+        std::fs::write(dir.join("cut_v1.mov"), []).unwrap();
+
+        // 2. Temp file -> state = partial
+        std::fs::write(dir.join("cut_v2.part"), [1, 2, 3, 4]).unwrap();
+
+        // 3. Normal finished render file
+        std::fs::write(dir.join("shot_v5.mp4"), [10; 256]).unwrap();
+
+        let result = scan(vec![dir.display().to_string()]);
+        assert_eq!(result.outputs.len(), 3);
+
+        let empty_out = result.outputs.iter().find(|o| o.name == "cut_v1.mov").unwrap();
+        assert_eq!(empty_out.state, "empty");
+        assert_eq!(empty_out.version, Some(1));
+        assert_eq!(empty_out.group, "cut");
+
+        let part_out = result.outputs.iter().find(|o| o.name == "cut_v2.part").unwrap();
+        assert_eq!(part_out.state, "partial");
+        assert_eq!(part_out.version, Some(2));
+        assert_eq!(part_out.group, "cut");
+
+        let ready_out = result.outputs.iter().find(|o| o.name == "shot_v5.mp4").unwrap();
+        assert_eq!(ready_out.version, Some(5));
+        assert_eq!(ready_out.group, "shot");
+        assert!(ready_out.state == "recent" || ready_out.state == "ready");
+
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
