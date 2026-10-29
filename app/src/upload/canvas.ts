@@ -7,9 +7,17 @@
 
 import { State } from "../core/state";
 import {
-  USC, eIn, eInOut, eOut, lerp, progressAt,
+  USC, eInOut, eOut, lerp, progressAt,
   type UploadEyeShape, type UploadFrame,
 } from "./sequence";
+import {
+  calcSuperellipseRadii,
+  calcSuperellipsePoint,
+  calcCrumbParticle,
+  calcSuckStripParams,
+  calcSuckWobble,
+  calcGlowTrailLength,
+} from "./upload-utils.js";
 
 const FONT = 'system-ui, "Segoe UI Variable Text", "Segoe UI", sans-serif';
 
@@ -22,17 +30,11 @@ function rr(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
 
 /** Superellipse body — port of usBodyPath(m, R). */
 function bodyPath(ctx: CanvasRenderingContext2D, m: number, R: number): { rx: number; ry: number } {
-  const mc = Math.max(0, Math.min(m, 1));
-  const n = 2.15 + (5.5 - 2.15) * mc;
-  const rx = R * (1.04 - 0.04 * mc);
-  const ry = R * (0.97 - 0.03 * mc);
+  const { rx, ry, n } = calcSuperellipseRadii(m, R);
   ctx.beginPath();
   for (let i = 0; i <= 96; i++) {
     const a = (i / 96) * Math.PI * 2;
-    const ca = Math.cos(a);
-    const sa = Math.sin(a);
-    const px = rx * Math.sign(ca) * Math.pow(Math.abs(ca), 2 / n);
-    const py = ry * Math.sign(sa) * Math.pow(Math.abs(sa), 2 / n);
+    const { x: px, y: py } = calcSuperellipsePoint(rx, ry, n, a);
     if (i === 0) ctx.moveTo(px, py);
     else ctx.lineTo(px, py);
   }
@@ -251,7 +253,7 @@ export class UploadCanvas {
       const v =
         (progressAt(f.t + 0.01, USC.T_PROG_START, f.progEnd) -
           progressAt(f.t, USC.T_PROG_START, f.progEnd)) / 0.01;
-      const tl = Math.max(8, Math.min(34, 8 + v * 40));
+      const tl = calcGlowTrailLength(v);
       const g = ctx.createLinearGradient(fx - tl, 0, fx, 0);
       g.addColorStop(0, "rgba(52,212,153,0)");
       g.addColorStop(1, "rgba(110,231,183,0.6)");
@@ -392,14 +394,11 @@ export class UploadCanvas {
     const m = f.mouthRect;
     const W0 = 34;
     const H0 = 42;
-    const p = eIn(f.suck);
     const topY = lerp(cy - H0 / 2, m.y - 2, eInOut(f.suck));
     const hs = lerp(1.08, 0.55, eInOut(f.suck));
     const Hh = H0 * hs;
-    const sc = lerp(1, 0.55, p);
-    const q = eOut(f.suck);
     const fCx = lerp(cx, m.x + m.w / 2, eOut(f.suck));
-    const wob = Math.sin(f.suck * Math.PI * 2) * 0.1 * (1 - p);
+    const wob = calcSuckWobble(f.suck);
     const clipY = m.y + m.h * 0.5;
 
     // The sheet is drawn as 28 horizontal strips, each narrowed towards the
@@ -411,8 +410,7 @@ export class UploadCanvas {
     ctx.clip();
 
     for (let i = 0; i < 28; i++) {
-      const v0 = i / 28;
-      const wsc = lerp(1, lerp(0.92, (0.22 * m.w) / W0, Math.pow(v0, 1.2)), q) * sc;
+      const { wsc, v0 } = calcSuckStripParams(i, 28, f.suck, m.w, W0);
       const yy = topY + v0 * Hh;
       const hh = Hh / 28 + 0.6;
 
@@ -430,20 +428,11 @@ export class UploadCanvas {
 
     // Green crumbs pulled in with the file.
     for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2 + 0.6;
-      const k = Math.max(0, Math.min(1, (f.suck - i * 0.08) / 0.7));
-      if (k <= 0 || k >= 1) continue;
-      const sx0 = cx + Math.cos(a) * 24;
-      const sy0 = cy + Math.sin(a) * 24;
-      const ex = m.x + m.w / 2;
-      const ey = m.y + m.h * 0.3;
-      const kk = Math.pow(k, 0.7);
-      const px = lerp(sx0, ex, kk);
-      const py = lerp(sy0, ey, kk) - Math.sin(Math.PI * k) * 6;
-      const rad = 2.2 * (1 - k * 0.5);
+      const crumb = calcCrumbParticle(i, 4, f.suck, cx, cy, m.x, m.y, m.w, m.h);
+      if (!crumb) continue;
       ctx.beginPath();
-      ctx.arc(px, py, rad, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(52,212,153,${1 - k})`;
+      ctx.arc(crumb.x, crumb.y, crumb.radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(52,212,153,${crumb.alpha})`;
       ctx.fill();
     }
   }
