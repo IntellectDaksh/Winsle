@@ -100,8 +100,12 @@ fn task_line(text: &str, stamp: &str) -> Result<String, String> {
     Ok(format!("- [ ] {text}  _({stamp})_\n"))
 }
 
+pub fn format_timestamp(year: u16, month: u16, day: u16, hour: u16, minute: u16) -> String {
+    format!("{:04}-{:02}-{:02} {:02}:{:02}", year, month, day, hour, minute)
+}
+
 /// Resolves target inbox.md path from configured folder or default Documents/Winsle folder,
-/// verifying against control characters and null bytes.
+/// verifying against control characters, null bytes, and directory traversal.
 pub fn resolve_inbox_path(configured: &str, default: Option<PathBuf>) -> Result<PathBuf, String> {
     let trimmed = configured.trim();
     if trimmed.is_empty() {
@@ -112,6 +116,9 @@ pub fn resolve_inbox_path(configured: &str, default: Option<PathBuf>) -> Result<
         return Err("invalid characters in capture directory".to_string());
     }
     let dir = PathBuf::from(trimmed);
+    if dir.components().any(|c| c == std::path::Component::ParentDir) {
+        return Err("directory traversal not permitted in capture directory".to_string());
+    }
     Ok(dir.join("inbox.md"))
 }
 
@@ -125,13 +132,12 @@ pub(crate) fn inbox_path(app: &AppHandle) -> Result<PathBuf, String> {
     resolve_inbox_path(&configured, default_dir())
 }
 
-
 #[tauri::command]
 pub fn capture_save(app: AppHandle, text: String) -> Result<String, String> {
     let path = inbox_path(&app)?;
     let dir = path.parent().ok_or("bad inbox path")?;
     let t = unsafe { GetLocalTime() };
-    let stamp = format!("{:04}-{:02}-{:02} {:02}:{:02}", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute);
+    let stamp = format_timestamp(t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute);
     let line = task_line(&text, &stamp)?;
     std::fs::create_dir_all(dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
     std::fs::OpenOptions::new()
