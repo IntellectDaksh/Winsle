@@ -310,5 +310,16 @@ mod tests {
             "- [ ] hello world task  _(2026-10-23)_\n"
         );
     }
+
+    #[test]
+    fn test_format_timestamp_and_traversal_guard() {
+        assert_eq!(format_timestamp(2026, 10, 29, 23, 40), "2026-10-29 23:40");
+        assert_eq!(format_timestamp(2026, 1, 5, 4, 9), "2026-01-05 04:09");
+
+        let def = Some(PathBuf::from("C:\\Users\\User\\Documents\\Winsle"));
+        assert!(resolve_inbox_path("..\\Sensitive", def.clone()).is_err());
+        assert!(resolve_inbox_path("D:\\Notes\\..\\Secret", def.clone()).is_err());
+        assert!(resolve_inbox_path("../traversal", def).is_err());
+    }
 }
 
