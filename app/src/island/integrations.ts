@@ -6,16 +6,20 @@ import { onEvent, Bridge, type IntegrationUpdate } from "../core/bridge";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
 import type { Island } from "./island";
+import {
+  INTEGRATION_SECRET_KEYS,
+  CLEAR_TASK_TIMEOUT_MS,
+  getSecretKeyForIntegration,
+  computeIntegrationState,
+  computeTaskEventUpdate,
+} from "./integration-utils.js";
 
-/** Which Credential Manager key backs each pill. */
-const KEY_FOR: Record<string, string> = {
-  integration_stripe: "stripe-api-key",
-  integration_github: "github-token",
-  integration_vercel: "vercel-token",
-  integration_n8n: "n8n-api-key",
-  integration_resend: "resend-api-key",
-  integration_notion: "notion-api-key",
-  integration_calcom: "calcom-api-key",
+export {
+  INTEGRATION_SECRET_KEYS,
+  CLEAR_TASK_TIMEOUT_MS,
+  getSecretKeyForIntegration,
+  computeIntegrationState,
+  computeTaskEventUpdate,
 };
 
 const clearTimers = new Map<string, number>();
@@ -27,7 +31,7 @@ export function registerIntegrationHandlers(island: Island) {
 
 /** Asks Rust which keys exist so the idle cards can say so. */
 export async function refreshConfigured() {
-  for (const [id, key] of Object.entries(KEY_FOR)) {
+  for (const [id, key] of Object.entries(INTEGRATION_SECRET_KEYS)) {
     const present = (await Bridge.secretPresent(key)) ?? false;
     const info = State.integrations[id] ?? { data: {}, error: null, loaded: false, configured: false };
     State.integrations[id] = { ...info, configured: present };
@@ -44,22 +48,18 @@ function handle(island: Island, update: IntegrationUpdate) {
   if (State.paused) return;
 
   const previous = State.integrations[update.id];
-  State.integrations[update.id] = {
-    data: update.error ? (previous?.data ?? {}) : update.data,
-    error: update.error,
-    loaded: update.error ? (previous?.loaded ?? false) : true,
-    configured: previous?.configured ?? true,
-  };
+  State.integrations[update.id] = computeIntegrationState(previous, update.data, update.error);
 
   const event = update.event;
   if (event) {
     const task = State.tasks.find((t) => t.id === update.id);
     if (task) {
-      task.state = event.success ? "finished" : "error";
-      task.steps = event.detail ? [event.label, event.detail] : [event.label];
-      task.stepIndex = task.steps.length - 1;
-      if (State.focusId !== update.id) {
-        task.pillBadge = event.success ? "finished" : "error";
+      const taskUpdate = computeTaskEventUpdate(event, State.focusId === update.id);
+      task.state = taskUpdate.state;
+      task.steps = taskUpdate.steps;
+      task.stepIndex = taskUpdate.stepIndex;
+      if (taskUpdate.pillBadge) {
+        task.pillBadge = taskUpdate.pillBadge;
       }
       Sound.play(event.success ? "finish" : "error");
       // Same as the Swift pollers: show the compact island so the badge is seen,
@@ -79,7 +79,7 @@ function handle(island: Island, update: IntegrationUpdate) {
           t.stepIndex = 0;
           t.pillBadge = null;
           State.notify();
-        }, 60_000),
+        }, CLEAR_TASK_TIMEOUT_MS),
       );
     }
   }
