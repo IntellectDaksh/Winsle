@@ -205,7 +205,7 @@ pub fn aggregate_distractions(days: &BTreeMap<String, BTreeMap<String, u64>>, ol
         }
     }
     let mut v: Vec<AppUsage> = sum.into_iter().map(|(name, secs)| AppUsage { name, secs }).collect();
-    v.sort_by(|a, b| b.secs.cmp(&a.secs));
+    v.sort_by(|a, b| b.secs.cmp(&a.secs).then_with(|| a.name.cmp(&b.name)));
     v
 }
 
@@ -269,6 +269,36 @@ mod tests {
             matches(&[], &sites, "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", "YouTube - Home - Google Chrome").as_deref(),
             Some("https://www.youtube.com/")
         );
+    }
+
+    #[test]
+    fn test_title_sanitizer_and_aggregation() {
+        assert_eq!(sanitize_window_title("YouTube\u{200b} - Google Chrome\x00"), "YouTube - Google Chrome");
+        assert_eq!(sanitize_window_title("Clean Title 123"), "Clean Title 123");
+
+        let mut days = BTreeMap::new();
+        let mut d1 = BTreeMap::new();
+        d1.insert("YouTube".into(), 150);
+        d1.insert("Twitter".into(), 60);
+        days.insert("2026-10-28".into(), d1);
+
+        let mut d2 = BTreeMap::new();
+        d2.insert("YouTube".into(), 180);
+        d2.insert("Reddit".into(), 300);
+        days.insert("2026-10-29".into(), d2);
+
+        let mut d_old = BTreeMap::new();
+        d_old.insert("Games".into(), 9999);
+        days.insert("2026-10-01".into(), d_old);
+
+        let top = aggregate_distractions(&days, "2026-10-28");
+        assert_eq!(top.len(), 3);
+        assert_eq!(top[0].name, "YouTube");
+        assert_eq!(top[0].secs, 330); // 150 + 180
+        assert_eq!(top[1].name, "Reddit");
+        assert_eq!(top[1].secs, 300);
+        assert_eq!(top[2].name, "Twitter");
+        assert_eq!(top[2].secs, 60);
     }
 }
 
