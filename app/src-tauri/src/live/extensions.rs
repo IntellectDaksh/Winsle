@@ -229,3 +229,112 @@ pub fn publish_event(event: &str, summary: &str) {
     }
     log.truncate(100);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_id_rules() {
+        assert!(valid_id("my-extension-1"));
+        assert!(valid_id("abc"));
+        assert!(valid_id("task-runner-v2"));
+
+        // Reject invalid IDs
+        assert!(!valid_id("")); // Empty
+        assert!(!valid_id("MyExtension")); // Uppercase
+        assert!(!valid_id("my extension")); // Space
+        assert!(!valid_id("my_extension")); // Underscore
+        assert!(!valid_id("../traversal")); // Path traversal
+        assert!(!valid_id(&"a".repeat(65))); // Too long
+    }
+
+    #[test]
+    fn test_manifest_metadata_validation() {
+        let valid = ExtensionManifest {
+            id: "notes-sync".into(),
+            name: "Notes Sync".into(),
+            description: "Sync notes locally".into(),
+            permissions: vec!["capture.write".into()],
+            subscriptions: vec![],
+            actions: vec![ExtensionAction {
+                id: "add-note".into(),
+                label: "Add Note".into(),
+                kind: "capture".into(),
+                prefix: "TODO: ".into(),
+            }],
+        };
+        assert!(validate(&valid).is_ok());
+
+        // Empty name
+        let mut invalid_name = valid.clone();
+        invalid_name.name = "   ".into();
+        assert!(validate(&invalid_name).is_err());
+
+        // Name too long
+        let mut long_name = valid.clone();
+        long_name.name = "a".repeat(81);
+        assert!(validate(&long_name).is_err());
+
+        // Description too long
+        let mut long_desc = valid.clone();
+        long_desc.description = "d".repeat(401);
+        assert!(validate(&long_desc).is_err());
+
+        // Too many actions
+        let mut many_actions = valid.clone();
+        many_actions.actions = (0..13)
+            .map(|i| ExtensionAction {
+                id: format!("action-{i}"),
+                label: "Act".into(),
+                kind: "capture".into(),
+                prefix: String::new(),
+            })
+            .collect();
+        assert!(validate(&many_actions).is_err());
+    }
+
+    #[test]
+    fn test_subscription_permission_pairing() {
+        let mut m = ExtensionManifest {
+            id: "notif-logger".into(),
+            name: "Logger".into(),
+            description: String::new(),
+            permissions: vec![],
+            subscriptions: vec!["notification".into()],
+            actions: vec![],
+        };
+        // Fails because events.notification is not in permissions
+        assert!(validate(&m).is_err());
+
+        // Adding events.notification satisfies subscription requirement
+        m.permissions.push("events.notification".into());
+        assert!(validate(&m).is_ok());
+
+        // Unsupported subscription
+        m.subscriptions.push("unknown_event".into());
+        assert!(validate(&m).is_err());
+    }
+
+    #[test]
+    fn test_action_permission_pairing() {
+        let mut m = ExtensionManifest {
+            id: "clip-tool".into(),
+            name: "Clip Tool".into(),
+            description: String::new(),
+            permissions: vec!["capture.write".into()],
+            subscriptions: vec![],
+            actions: vec![ExtensionAction {
+                id: "copy-now".into(),
+                label: "Copy".into(),
+                kind: "clipboard".into(),
+                prefix: String::new(),
+            }],
+        };
+        // Fails because kind=clipboard requires clipboard.write
+        assert!(validate(&m).is_err());
+
+        m.permissions.push("clipboard.write".into());
+        assert!(validate(&m).is_ok());
+    }
+}
