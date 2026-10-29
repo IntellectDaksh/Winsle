@@ -16,14 +16,18 @@ import { evaluate, convert } from "./calc";
 import { Agent } from "./agent";
 import { coachPanel } from "./coach";
 import { answerBubble } from "./views3";
+import {
+  DEV_STATUS_MAP,
+  getDevStatusDisplay,
+  formatContextBar,
+  calcDevStatsSummary,
+} from "./view-utils.js";
 
-const STATUS: Record<string, { text: string; cls: string }> = {
-  thinking: { text: "Thinking", cls: "think" },
-  working: { text: "Working", cls: "work" },
-  waiting: { text: "Needs you", cls: "wait" },
-  done: { text: "Done", cls: "done" },
-  error: { text: "Error", cls: "err" },
-  idle: { text: "Idle", cls: "idle" },
+export {
+  DEV_STATUS_MAP,
+  getDevStatusDisplay,
+  formatContextBar,
+  calcDevStatsSummary,
 };
 
 function chip(cls = ""): { el: HTMLElement; set(text: string | null, title?: string): void } {
@@ -94,7 +98,7 @@ function buildDev(): ViewHost {
       none.style.display = !s && !showHistory ? "" : "none";
       copyBtn.style.display = codeBtn.style.display = s ? "" : "none";
       name.textContent = showHistory ? "Recent turns" : s?.project ?? "Coding";
-      const st = STATUS[s?.status ?? "idle"];
+      const st = getDevStatusDisplay(s?.status);
       status.textContent = showHistory ? "" : st.text;
       status.className = `dv-status ${showHistory ? "hide" : st.cls}`;
       clock.textContent = s && !showHistory ? fmtDuration(Dev.elapsed()) : "";
@@ -182,7 +186,7 @@ export function buildDevMini(open: () => void): { el: HTMLElement; sync(): void 
       const s = Dev.session;
       if (!s) return;
       name.textContent = s.project;
-      const st = STATUS[s.status];
+      const st = getDevStatusDisplay(s.status);
       status.textContent = st.text;
       status.className = `dv-status ${st.cls}`;
       const cur = Dev.current();
