@@ -1,0 +1,34 @@
+.pd-panel .lv-body { gap: 7px; min-width: 0; justify-content: flex-start; }
+.pd-head, .pd-toolbar, .pd-row, .pd-metrics, .pd-tasks { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.pd-head strong { font-size: 13px; letter-spacing: -.025em; white-space: nowrap; }
+.pd-spacer { flex: 1; }
+.pd-summary, .pd-muted { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.pd-toolbar { flex-wrap: wrap; }
+.pd-select, .pd-path, .pd-action {
+  min-height: 28px; border: 1px solid rgba(255,255,255,.14); border-radius: 8px;
+  background: rgba(255,255,255,.055); color: inherit; font: inherit; font-size: 11px;
+}
+.pd-select, .pd-path { padding: 4px 7px; }
+.pd-select option { background: #202328; color: #f5f5f4; }
+.pd-path { flex: 1; min-width: 160px; }
+.pd-action { padding: 4px 9px; cursor: pointer; white-space: nowrap; transition: background-color .16s, transform .16s; }
+.pd-action:hover { background: rgba(255,255,255,.14); }
+.pd-action:active { transform: translateY(1px); }
+.pd-action:disabled { cursor: wait; opacity: .5; }
+.pd-action:focus-visible, .pd-select:focus-visible, .pd-path:focus-visible, .pd-output:focus-visible { outline: 2px solid var(--green-2, #8acbaa); outline-offset: 2px; }
+.pd-notice { min-height: 13px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.pd-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain; }
+.pd-row { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.075); }
+.pd-row-main { min-width: 0; flex: 1; }
+.pd-name, .pd-project { font-weight: 600; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pd-meta { color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pd-state { border-radius: 99px; padding: 3px 7px; font-size: 9px; white-space: nowrap; background: rgba(255,255,255,.09); }
+.pd-state.empty, .pd-state.partial, .pd-state.stalled { color: #f5bc8d; background: rgba(245,151,65,.13); }
+.pd-state.recent { color: #a7d9bb; background: rgba(95,181,128,.14); }
+.pd-overview { min-width: 0; }
+.pd-metrics { flex-wrap: wrap; gap: 4px; margin-top: 4px; font-size: 10px; font-variant-numeric: tabular-nums; }
+.pd-metrics span { padding: 3px 6px; border-radius: 6px; background: rgba(255,255,255,.075); }
+.pd-warning { color: #f5bc8d; font-size: 10px; overflow-wrap: anywhere; }
+.pd-tasks { flex-wrap: wrap; gap: 5px; }
+.pd-output { min-height: 40px; max-height: 74px; margin: 0; padding: 7px; overflow: auto; border-radius: 7px; background: rgba(0,0,0,.18); color: #d9e4dc; font-size: 10px; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .pd-action { transition: none; } }
