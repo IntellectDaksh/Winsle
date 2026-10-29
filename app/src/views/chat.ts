@@ -7,6 +7,21 @@ import { Bridge, type ChatContext } from "../core/bridge";
 import { Sound } from "../core/sound";
 import { State, type ChatMessage } from "../core/state";
 import type { ViewHost } from "./views";
+import {
+  sanitizeChatPrompt,
+  boundChatHistory,
+  getPlaceholderText,
+  calcChatChipLabel,
+  shouldAttachFileContext,
+} from "./chat-utils.js";
+
+export {
+  sanitizeChatPrompt,
+  boundChatHistory,
+  getPlaceholderText,
+  calcChatChipLabel,
+  shouldAttachFileContext,
+};
 
 let nextId = 1;
 
@@ -59,24 +74,28 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   let renderedCount = -1;
 
   async function submit() {
-    const query = input.value.trim();
+    const query = sanitizeChatPrompt(input.value);
     if (!query || sending) return;
     input.value = "";
     sending = true;
     Sound.play("send");
 
     State.chatHistory.push({ id: nextId++, role: "user", content: query });
+    State.chatHistory = boundChatHistory(State.chatHistory);
     State.stateOverride = "thinking";
     State.notify();
     onHeightChange();
 
     const file = State.droppedFile;
     const context: ChatContext | null =
-      State.chatHistory.length === 1 && file ? { kind: "file", name: file.name, path: file.path } : null;
+      shouldAttachFileContext(State.chatHistory.length, !!file) && file
+        ? { kind: "file", name: file.name, path: file.path }
+        : null;
 
     try {
       const reply = await Bridge.chatSend(query, context);
       State.chatHistory.push({ id: nextId++, role: "assistant", content: reply.text });
+      State.chatHistory = boundChatHistory(State.chatHistory);
       State.stateOverride = null;
       Sound.play("finish");
     } catch (err) {
@@ -105,7 +124,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     el,
     sync() {
       const file = State.droppedFile;
-      const wantChip = file?.name ?? "";
+      const wantChip = calcChatChipLabel(file);
       if (chipRow.dataset.label !== wantChip) {
         chipRow.dataset.label = wantChip;
         clear(chipRow);
@@ -122,7 +141,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
         log.scrollTop = log.scrollHeight;
       }
 
-      input.placeholder = State.chatHistory.length === 0 ? "Ask me anything…" : "Continue…";
+      input.placeholder = getPlaceholderText(State.chatHistory.length);
       input.disabled = sending;
     },
     focus() {
