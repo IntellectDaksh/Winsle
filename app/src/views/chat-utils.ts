@@ -11,6 +11,7 @@ export const MAX_CHAT_HISTORY_ENTRIES = 50;
 export function sanitizeChatPrompt(input: string, maxChars = MAX_CHAT_PROMPT_LENGTH): string {
   if (!input) return "";
   const cleaned = input
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
     .trim();
   return cleaned.slice(0, maxChars);
