@@ -252,19 +252,39 @@ pub(crate) fn friendly_app(aumid: &str) -> String {
     c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
 }
 
+pub fn parse_media_action(action: &str) -> Result<&'static str, String> {
+    match action.trim().to_ascii_lowercase().as_str() {
+        "play_pause" | "toggle" | "play" | "pause" => Ok("play_pause"),
+        "next" | "skip" => Ok("next"),
+        "prev" | "previous" => Ok("prev"),
+        other => Err(format!("unknown media action: {other}")),
+    }
+}
+
+pub fn clamp_seek_position(seconds: f64, duration: Option<f64>) -> Result<f64, String> {
+    if !seconds.is_finite() || seconds < 0.0 {
+        return Err("bad position".into());
+    }
+    match duration {
+        Some(dur) if dur > 0.0 => Ok(seconds.min(dur)),
+        _ => Ok(seconds),
+    }
+}
+
 #[tauri::command]
 pub async fn media_control(action: String) -> Result<(), String> {
+    let act = parse_media_action(&action)?;
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
         }
         let mgr = Manager::RequestAsync().and_then(|o| o.get()).map_err(|e| e.to_string())?;
         let s = current_session(&mgr).ok_or("no media session")?;
-        let op = match action.as_str() {
+        let op = match act {
             "play_pause" => s.TryTogglePlayPauseAsync(),
             "next" => s.TrySkipNextAsync(),
             "prev" => s.TrySkipPreviousAsync(),
-            other => return Err(format!("unknown media action: {other}")),
+            _ => unreachable!(),
         };
         match op.and_then(|o| o.get()) {
             Ok(true) => Ok(()),
@@ -278,16 +298,14 @@ pub async fn media_control(action: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn media_seek(seconds: f64) -> Result<(), String> {
-    if !seconds.is_finite() || seconds < 0.0 {
-        return Err("bad position".into());
-    }
+    let safe_pos = clamp_seek_position(seconds, None)?;
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
         }
         let mgr = Manager::RequestAsync().and_then(|o| o.get()).map_err(|e| e.to_string())?;
         let s = current_session(&mgr).ok_or("no media session")?;
-        match s.TryChangePlaybackPositionAsync((seconds * 1e7) as i64).and_then(|o| o.get()) {
+        match s.TryChangePlaybackPositionAsync((safe_pos * 1e7) as i64).and_then(|o| o.get()) {
             Ok(true) => Ok(()),
             Ok(false) => Err("app refused the command".into()),
             Err(e) => Err(e.to_string()),
