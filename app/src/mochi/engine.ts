@@ -8,20 +8,39 @@ import { Ease, lerp, type EaseFn } from "../core/anim";
 import { Sound } from "../core/sound";
 import type { BotEmoteName, BotStateName } from "../core/layout";
 
+import {
+  type EyeShape,
+  type BadgeKind,
+  type Badge,
+  type RGB,
+  type BotStateCfg,
+  C,
+  BOT_STATES,
+  STATE_SOUND,
+  EMOTE_EYE,
+  hexToRGB,
+  rgba,
+  mix3,
+  getEmoteEye,
+} from "./mochi-utils.js";
+
+export {
+  type EyeShape,
+  type BadgeKind,
+  type Badge,
+  type RGB,
+  type BotStateCfg,
+  C,
+  BOT_STATES,
+  STATE_SOUND,
+  EMOTE_EYE,
+  hexToRGB,
+  rgba,
+  mix3,
+  getEmoteEye,
+};
+
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-export type EyeShape =
-  | "pill" | "wide" | "dot" | "line" | "flat" | "happy" | "closed"
-  | "spiral" | "heart" | "star" | "tired" | "wink" | "cup";
-
-export type BadgeKind = "dots" | "bang" | "question" | "dot";
-
-export interface Badge {
-  kind: BadgeKind;
-  color: RGB;
-}
-
-export type RGB = readonly [number, number, number]; // components 0…1
 
 export type TweenKey = readonly [target: number, durationMs: number, ease: EaseFn];
 
@@ -37,20 +56,6 @@ interface Tween {
 type PropKey =
   | "yaw" | "pitch" | "roll" | "tilt" | "open" | "sx" | "sy"
   | "oy" | "ox" | "tint" | "morph" | "hands" | "blush" | "es" | "badgeS";
-
-interface BotStateCfg {
-  color: RGB;
-  tint: number;
-  eye: EyeShape;
-  badge: Badge | null;
-  bounces: boolean;
-  scans: boolean;
-  breathes: boolean;
-  zz: boolean;
-  sweat: boolean;
-  look: readonly [number, number] | null;
-  tilt: number;
-}
 
 interface Particle {
   type: "heart" | "star" | "spark" | "sweat" | "z";
@@ -69,67 +74,9 @@ const BASE_BOTTOM: RGB = [0.769, 0.773, 0.792]; // #C4C5CA
 const INK = "rgb(26,20,18)"; // #1A1412
 const MINI_INK = "rgb(16,19,26)"; // #10131A
 
-const C = {
-  idle: [0.902, 0.914, 0.933] as RGB,
-  working: [0.231, 0.62, 1] as RGB,
-  thinking: [0.545, 0.361, 0.965] as RGB,
-  searching: [0.388, 0.396, 0.949] as RGB,
-  approval: [0.961, 0.647, 0.141] as RGB,
-  question: [0.133, 0.827, 0.933] as RGB,
-  error: [0.957, 0.314, 0.369] as RGB,
-  finished: [0.204, 0.831, 0.6] as RGB,
-  ratelimit: [0.984, 0.573, 0.235] as RGB,
-  sleeping: [0.58, 0.635, 0.722] as RGB,
-  dizzy: [0.957, 0.447, 0.714] as RGB,
-};
-
-const base = {
-  bounces: false, scans: false, breathes: false, zz: false, sweat: false,
-  look: null, tilt: 0,
-};
-
-export const BOT_STATES: Record<BotStateName, BotStateCfg> = {
-  idle: { ...base, color: C.idle, tint: 0, eye: "pill", badge: null },
-  working: { ...base, color: C.working, tint: 0.72, eye: "pill", badge: { kind: "dots", color: C.working } },
-  thinking: { ...base, color: C.thinking, tint: 0.72, eye: "pill", badge: { kind: "dots", color: C.thinking }, look: [0.55, 0.55] },
-  searching: { ...base, color: C.searching, tint: 0.72, eye: "pill", badge: { kind: "dots", color: C.searching }, scans: true },
-  approval: { ...base, color: C.approval, tint: 0.78, eye: "wide", badge: { kind: "bang", color: C.approval }, bounces: true },
-  question: { ...base, color: C.question, tint: 0.75, eye: "pill", badge: { kind: "question", color: C.question }, tilt: 0.17 },
-  error: { ...base, color: C.error, tint: 0.78, eye: "flat", badge: { kind: "dot", color: C.error } },
-  finished: { ...base, color: C.finished, tint: 0.35, eye: "happy", badge: { kind: "dot", color: C.finished } },
-  ratelimit: { ...base, color: C.ratelimit, tint: 0.72, eye: "tired", badge: { kind: "dot", color: C.ratelimit }, sweat: true },
-  sleeping: { ...base, color: C.sleeping, tint: 0.32, eye: "closed", badge: null, breathes: true, zz: true },
-  dizzy: { ...base, color: C.dizzy, tint: 0.7, eye: "spiral", badge: null },
-};
-
-/** State → sound, as in BotStateCfg.sound. */
-export const STATE_SOUND: Partial<Record<BotStateName, string>> = {
-  working: "work", thinking: "think", searching: "search", approval: "approval",
-  question: "question", error: "error", finished: "finish", ratelimit: "rate",
-  sleeping: "sleep", dizzy: "dizzy",
-};
-
-const EMOTE_EYE: Record<BotEmoteName, EyeShape> = {
-  love: "heart", surprised: "dot", proud: "star", wink: "wink",
-  yawn: "tired", happy: "happy", annoyed: "line",
-};
-
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
 const now = () => performance.now() / 1000;
-
-export function hexToRGB(hex: string): RGB {
-  const h = hex.replace("#", "");
-  const v = parseInt(h, 16);
-  return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
-}
-
-const rgba = (c: RGB, a = 1) =>
-  `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
-
-const mix3 = (a: RGB, b: RGB, t: number): RGB => [
-  lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t),
-];
 
 function roundRectPath(x: CanvasRenderingContext2D, X: number, Y: number, W: number, H: number, R: number) {
   const r = Math.max(0, Math.min(R, W / 2, H / 2));
