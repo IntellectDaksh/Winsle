@@ -388,6 +388,28 @@ ew.pdf");
     }
 
     #[test]
+    fn test_growth_rate_and_smoothing() {
+        assert_eq!(calc_growth_rate(100, 250, 1.0), 150.0);
+        assert_eq!(calc_growth_rate(100, 250, 0.5), 300.0);
+        assert_eq!(calc_growth_rate(250, 100, 1.0), 0.0);
+        assert_eq!(calc_growth_rate(100, 250, 0.0), 0.0);
+        assert_eq!(calc_growth_rate(100, 250, -5.0), 0.0);
+        assert_eq!(calc_growth_rate(100, 250, f64::NAN), 0.0);
+
+        assert_eq!(smooth_speed(0.0, 150.0, 0.3), 150.0);
+        assert_eq!(smooth_speed(100.0, 200.0, 0.3), 130.0);
+
+        assert!(is_render_file("output.mkv"));
+        assert!(is_render_file("TRACK.WAV"));
+        assert!(is_render_file("frame.EXR"));
+        assert!(!is_render_file("script.py"));
+
+        assert!(is_temp(".DS_Store"));
+        assert!(is_temp("cache.tmp"));
+        assert!(!is_temp("video.mp4"));
+    }
+
+    #[test]
     #[ignore]
     fn real_downloads() {
         let d = downloads_dir();
