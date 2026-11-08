@@ -24,6 +24,8 @@ Winsle is a Tauri 2 app: a Rust backend that talks to Windows, and a single alwa
 | `secrets.rs` | Windows Credential Manager wrapper |
 | `settings.rs` | `%APPDATA%\Winsle\settings.json` |
 | `files.rs` | Dropped-file inbox |
+| `workspaces.rs` | Active project directory detection and workspace grouping |
+| `updater.rs` | GitHub release update checks and version verification |
 | `tray.rs`, `log.rs`, `win_user.rs` | Tray menu, log file, Win32 helpers |
 
 ### Live pollers (`src-tauri/src/live`)
