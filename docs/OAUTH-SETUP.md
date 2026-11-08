@@ -15,7 +15,7 @@ Scopes: `user-library-read user-library-modify user-modify-playback-state user-r
 Limits:
 - Development mode allows only 25 users, each added by email under the app's *User Management*, until Spotify grants **Extended Quota Mode** (apply in the dashboard; needs a reviewed app).
 - Play, queue and start-playlist need **Spotify Premium**; free accounts get "Spotify Premium is required for playback control." Liking and listing playlists work on free.
-- Port 8898 must be free during sign-in.
+- Port 8898 must be free during sign-in (Spotify loopback redirects require an exact port match with your registered dashboard callback URL).
 
 ## Google Calendar
 
