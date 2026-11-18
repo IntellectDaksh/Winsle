@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
   <img src="app/src-tauri/icons/128x128.png" width="96" height="96" alt="Winsle logo" />
 
   # Winsle
@@ -18,25 +18,24 @@ Winsle brings a fluid, interactive dynamic island to Windows. It sits subtly at 
 
 **Local-first by design.** No cloud server, no telemetry, and no Winsle account. The network is only touched for services you explicitly link, the optional keyless Spotify lyrics lookup (`lrclib.net`), and signed updater checks. Tokens and keys reside strictly in the **Windows Credential Manager** or your local `.env`, never in code.
 
----
 
-> [!IMPORTANT]
-> ### ⚡ Installation Options (Windows 10 / 11 64-bit)
->
-> #### 🚀 Option 1: Instant 1-Line Install (Zero SmartScreen Prompts — Recommended)
-> Open PowerShell and run:
-> ```powershell
-> irm https://raw.githubusercontent.com/IntellectDaksh/Winsle/master/scripts/install.ps1 | iex
-> ```
-> *Downloads, removes Windows quarantine flags (no SmartScreen popups), and launches the installer directly.*
->
-> #### 📥 Option 2: Direct Setup Executable
-> 1. Download **[Winsle-Windows-setup.exe](https://github.com/IntellectDaksh/Winsle/releases/download/v1.0.0/Winsle-Windows-setup.exe)** from [**Releases**](https://github.com/IntellectDaksh/Winsle/releases).
-> 2. Double-click to install. All runtimes (including Microsoft WebView2) are automatically configured.
-> 3. *SmartScreen note:* On fresh community releases, Windows Defender SmartScreen may ask for confirmation. The binary is signed by **IntellectDaksh** — simply click **More info → Run anyway**.
->
-> #### 📦 Option 3: Portable Zero-Install (.zip)
-> Grab **[Winsle-Windows-1.0.0-portable.zip](https://github.com/IntellectDaksh/Winsle/releases/download/v1.0.0/Winsle-Windows-1.0.0-portable.zip)**, unzip anywhere, and run `winsle.exe`. No installer needed!
+## ⚡ Quick Install (Windows 10 / 11 64-bit)
+
+### 🚀 Option 1: Instant 1-Line Install (Zero SmartScreen Prompts — Recommended)
+Open PowerShell and run:
+`powershell
+irm https://raw.githubusercontent.com/IntellectDaksh/Winsle/main/scripts/install.ps1 | iex
+`
+*Downloads, removes Windows quarantine flags (no SmartScreen popups), and launches the installer directly.*
+
+### 📥 Option 2: Direct Setup Executable
+1. Download **[Winsle-Windows-setup.exe](https://github.com/IntellectDaksh/Winsle/releases/latest)** from [**Releases**](https://github.com/IntellectDaksh/Winsle/releases).
+2. Double-click to install. All runtimes (including Microsoft WebView2) are automatically configured.
+3. *SmartScreen note:* On fresh community releases, Windows Defender SmartScreen may ask for confirmation. The binary is signed by **IntellectDaksh** — simply click **More info → Run anyway**.
+4. *First-Launch Setup:* All integrations (Spotify, Calendar, Phone Link) are 100% optional. You can configure them in Settings or simply close the window to start using Winsle immediately.
+
+### 📦 Option 3: Portable Zero-Install (.zip)
+Grab **[Winsle-Windows-1.0.0-portable.zip](https://github.com/IntellectDaksh/Winsle/releases/latest)**, unzip anywhere, and run winsle.exe. No installer needed!
 
 ---
 
@@ -70,37 +69,10 @@ Only required if compiling or modifying the source code:
 
 ---
 
-## Install & Quick Start
+## 🛠️ Building from Source
 
-### 🚀 Option 1: 1-Line PowerShell Install (Recommended — No SmartScreen Prompts)
-Run this single command in PowerShell (Win+X, then select Terminal / PowerShell):
-```powershell
-irm https://raw.githubusercontent.com/IntellectDaksh/Winsle/master/scripts/install.ps1 | iex
-```
-* **Zero SmartScreen Prompts:** PowerShell unblocks the installer upon download, so Windows runs it immediately without warning screens.
-* **Auto-Setup:** Downloads the signed installer with the official Mochi mascot icon, configures runtime files, and launches Winsle.
-
-### 📥 Option 2: Pre-built Executable Setup
-1. **Download:** Get `Winsle-Windows-setup.exe` or `Winsle-Windows-1.0.0-setup.exe` from [**Releases**](https://github.com/IntellectDaksh/Winsle/releases).
-2. **Run Installer:** Double-click the `.exe` to install.
-   * Features the custom **Mochi mascot icon**.
-   * Authenticode signed by **Winsle (IntellectDaksh)**.
-   * If Microsoft WebView2 is missing on your system, the installer will **automatically download and install it silently**.
-   * Background relays (`winsle-hook.exe`), tactile sounds, and system tray hooks are automatically deployed to `%LOCALAPPDATA%\Winsle\bin`.
-3. **SmartScreen Notice:** If Windows Defender SmartScreen displays a blue banner, click **More info → Run anyway**. (To skip this completely, use Option 1).
-4. **First-Launch Setup (Configure or Skip):**
-   * Winsle will automatically launch and present the **Settings window**.
-   * You can choose to connect your accounts (Spotify, Calendar, Phone Link, API keys).
-   * **Or simply close / skip it!** All integrations are completely optional. Winsle immediately functions as a dynamic island, clipboard manager, and system HUD with zero keys set up.
-
-### 📦 Option 3: Portable ZIP (No Installation)
-1. Download `Winsle-Windows-1.0.0-portable.zip` from [**Releases**](https://github.com/IntellectDaksh/Winsle/releases).
-2. Extract the folder anywhere on your PC.
-3. Run `winsle.exe` directly!
-
-### 🛠️ Developer Option: Build from Source
-If you wish to compile Winsle yourself:
-```bash
+If you wish to compile Winsle yourself from source:
+`ash
 # 1. Clone the repository
 git clone https://github.com/IntellectDaksh/Winsle.git
 cd Winsle/app
@@ -113,8 +85,8 @@ npm run tauri dev
 
 # 4. Compile a standalone release package
 npm run pack
-```
-Compiled setup installers and standalone binaries land in `app/release/` and `app/src-tauri/target/release/winsle.exe`.
+`
+Compiled setup installers and standalone binaries land in pp/release/ and pp/src-tauri/target/release/winsle.exe.
 
 ---
 
