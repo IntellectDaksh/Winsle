@@ -127,3 +127,37 @@ pub(crate) fn flash(title: &str, sub: &str) -> serde_json::Value {
     };
     serde_json::json!({ "title": clean(title), "sub": clean(sub) })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_version_allows_semver_and_strips_control_chars() {
+        assert_eq!(sanitize_version("1.2.3"), "1.2.3");
+        assert_eq!(sanitize_version("  2.0.0-beta.1+build.42  "), "2.0.0-beta.1+build.42");
+        assert_eq!(sanitize_version("1.0.0\r\n<script>"), "1.0.0script");
+        assert_eq!(sanitize_version("   "), "latest");
+        assert_eq!(sanitize_version("\x00\x1b"), "latest");
+    }
+
+    #[test]
+    fn sanitize_version_enforces_max_length() {
+        let long = "1".repeat(64);
+        assert_eq!(sanitize_version(&long).len(), MAX_VERSION_LEN);
+    }
+
+    #[test]
+    fn format_labels_use_sanitized_version() {
+        assert_eq!(format_install_label("1.4.2\n"), "Install update 1.4.2");
+        assert_eq!(format_available_title("1.4.2\t"), "Update 1.4.2 available");
+        assert_eq!(format_install_label(""), "Install update latest");
+    }
+
+    #[test]
+    fn flash_strips_control_characters_and_bounds_length() {
+        let v = flash("Update\nready\x07", &"x".repeat(300));
+        assert_eq!(v["title"], "Updateready");
+        assert_eq!(v["sub"].as_str().unwrap().len(), MAX_FLASH_LEN);
+    }
+}
