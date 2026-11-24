@@ -54,12 +54,60 @@ pub struct ScreenInfo {
 /// The island shape in window-logical coordinates, pushed by the front end.
 /// The poll thread owns the click-through decision so it lands in the same 16 ms
 /// tick as the cursor read — an IPC round trip here loses clicks.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub struct IslandRect {
     pub x: f64,
     pub y: f64,
     pub w: f64,
     pub h: f64,
+}
+
+impl IslandRect {
+    /// Clamps non-finite coordinates and negative sizes pushed over IPC.
+    pub fn sanitized(self) -> Self {
+        let finite = |v: f64| if v.is_finite() { v } else { 0.0 };
+        Self {
+            x: finite(self.x),
+            y: finite(self.y),
+            w: finite(self.w).max(0.0),
+            h: finite(self.h).max(0.0),
+        }
+    }
+
+    /// True if logical point `(x, y)` falls inside the island rect expanded by `margin`.
+    pub fn contains_with_margin(&self, x: f64, y: f64, margin: f64) -> bool {
+        if !x.is_finite() || !y.is_finite() || self.w <= 0.0 || self.h <= 0.0 {
+            return false;
+        }
+        let m = if margin.is_finite() { margin.max(0.0) } else { 0.0 };
+        x >= self.x - m && x <= self.x + self.w + m && y >= self.y - m && y <= self.y + self.h + m
+    }
+}
+
+/// Normalizes a DPI scale factor to `[0.5, 4.0]`, falling back to `1.0` for invalid values.
+pub(crate) fn safe_scale(scale: f64) -> f64 {
+    if scale.is_finite() && scale > 0.0 {
+        scale.clamp(0.5, 4.0)
+    } else {
+        1.0
+    }
+}
+
+/// Computes physical `(x, y, width, height)` for the island window centered at the top of a monitor.
+pub(crate) fn compute_window_geometry(
+    mon_x: i32,
+    mon_y: i32,
+    mon_w: u32,
+    scale: f64,
+    collapsed: bool,
+) -> (i32, i32, u32, u32) {
+    let s = safe_scale(scale);
+    let (lw, lh) = if collapsed { (STRIP_W, STRIP_H) } else { (PANEL_W, PANEL_H) };
+    let pw = (lw * s).round().max(1.0) as u32;
+    let ph = (lh * s).round().max(1.0) as u32;
+    let x = mon_x.saturating_add((mon_w as i32 - pw as i32) / 2);
+    let y = mon_y;
+    (x, y, pw, ph)
 }
 
 /// Wakes / parks the cursor poll thread so a hidden island costs literally nothing.
@@ -87,7 +135,7 @@ impl PollGate {
     }
 
     pub fn set_rect(&self, rect: IslandRect) {
-        *self.rect.lock().unwrap() = rect;
+        *self.rect.lock().unwrap() = rect.sanitized();
     }
 
     /// Forces the next poll tick to re-apply the flag (after a window resize).
@@ -196,7 +244,7 @@ fn target_monitor(app: &AppHandle, pref: &str) -> Option<Monitor> {
 pub fn screen_info(app: &AppHandle, pref: &str) -> ScreenInfo {
     match target_monitor(app, pref) {
         Some(m) => {
-            let scale = m.scale_factor();
+            let scale = safe_scale(m.scale_factor());
             let p = m.position();
             let s = m.size();
             ScreenInfo {
@@ -216,15 +264,9 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
     let Some(win) = window(app) else { return };
     let Some(m) = target_monitor(app, pref) else { return };
 
-    let scale = m.scale_factor();
     let mp = *m.position();
     let ms = *m.size();
-
-    let (lw, lh) = if collapsed { (STRIP_W, STRIP_H) } else { (PANEL_W, PANEL_H) };
-    let pw = (lw * scale).round().max(1.0) as u32;
-    let ph = (lh * scale).round().max(1.0) as u32;
-    let x = mp.x + (ms.width as i32 - pw as i32) / 2;
-    let y = mp.y;
+    let (x, y, pw, ph) = compute_window_geometry(mp.x, mp.y, ms.width, m.scale_factor(), collapsed);
 
     let _ = win.set_size(PhysicalSize::new(pw, ph));
     let _ = win.set_position(PhysicalPosition::new(x, y));
@@ -330,11 +372,7 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 // shape. A small entry margin means the flag is already off by the
                 // time a moving cursor reaches a button.
                 let r = *gate.rect.lock().unwrap();
-                let on_island = r.w > 0.0
-                    && x >= r.x - HIT_MARGIN
-                    && x <= r.x + r.w + HIT_MARGIN
-                    && y >= r.y - HIT_MARGIN
-                    && y <= r.y + r.h + HIT_MARGIN;
+                let on_island = r.contains_with_margin(x, y, HIT_MARGIN);
 
                 // A file being dragged has to be able to find us. WS_EX_TRANSPARENT
                 // — what click-through is on Windows — hides the window from
