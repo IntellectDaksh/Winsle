@@ -13,6 +13,67 @@ const BASE: &str = "http://127.0.0.1:11434";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 /// How long Ollama keeps the model in memory after a request.
 const KEEP_ALIVE: &str = "3m";
+const MAX_MODEL_LEN: usize = 128;
+const MAX_SYSTEM_LEN: usize = 8_000;
+const MAX_PROMPT_LEN: usize = 20_000;
+const MAX_JOURNAL_CHARS: usize = 8_000;
+
+/// Validates an Ollama model identifier (e.g. `llama3.2:latest`, `qwen2.5-coder:7b`).
+pub(crate) fn is_valid_model_name(raw: &str) -> bool {
+    let s = raw.trim();
+    !s.is_empty()
+        && s.len() <= MAX_MODEL_LEN
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ':' | '/'))
+}
+
+/// Validates model, system prompt, and user prompt lengths before calling Ollama.
+pub(crate) fn validate_chat_request(model: &str, system: &str, prompt: &str) -> Result<String, String> {
+    if !is_valid_model_name(model) {
+        return Err("invalid model name".into());
+    }
+    if system.len() > MAX_SYSTEM_LEN {
+        return Err("system prompt too large".into());
+    }
+    if prompt.trim().is_empty() || prompt.len() > MAX_PROMPT_LEN {
+        return Err("bad request".into());
+    }
+    Ok(model.trim().to_string())
+}
+
+/// Strips `<think>…</think>` reasoning blocks emitted by local reasoning models.
+pub(crate) fn strip_think_tags(raw: &str) -> String {
+    let trimmed = raw.trim();
+    match trimmed.rfind("</think>") {
+        Some(i) => trimmed[i + "</think>".len()..].trim().to_string(),
+        None => trimmed.to_string(),
+    }
+}
+
+/// Ensures a shortcut path is strictly a direct `.lnk` child of `recent_dir` with no traversal segments.
+pub(crate) fn is_safe_recent_shortcut(path: &std::path::Path, recent_dir: &std::path::Path) -> bool {
+    if path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return false;
+    }
+    path.parent().is_some_and(|d| d == recent_dir)
+        && path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("lnk"))
+}
+
+/// Caps and trims a journal entry; returns `None` if nothing non-whitespace remains.
+pub(crate) fn sanitize_journal_entry(text: &str) -> Option<String> {
+    let bounded: String = text.chars().take(MAX_JOURNAL_CHARS).collect();
+    let trimmed = bounded.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -82,9 +143,7 @@ pub async fn ai_start() -> Result<bool, String> {
 /// One non-streaming chat turn. `json: true` asks Ollama to constrain the reply to JSON.
 #[tauri::command]
 pub async fn ai_chat(model: String, system: String, prompt: String, json: bool) -> Result<String, String> {
-    if model.trim().is_empty() || prompt.len() > 20_000 {
-        return Err("bad request".into());
-    }
+    let model = validate_chat_request(&model, &system, &prompt)?;
     let mut body = json!({
         "model": model,
         "stream": false,
@@ -111,13 +170,8 @@ pub async fn ai_chat(model: String, system: String, prompt: String, json: bool) 
         return Err(format!("Ollama {status}: {}", text.chars().take(200).collect::<String>()));
     }
     let v: Value = resp.json().await.map_err(|e| e.to_string())?;
-    let content = v["message"]["content"].as_str().unwrap_or("").trim();
-    // Reasoning models wrap their thinking in <think>…</think>; drop it.
-    let content = match content.rfind("</think>") {
-        Some(i) => content[i + 8..].trim(),
-        None => content,
-    };
-    Ok(content.to_string())
+    let content = v["message"]["content"].as_str().unwrap_or("");
+    Ok(strip_think_tags(content))
 }
 
 // ── Recent files and the journal ─────────────────────────────────────────────
@@ -169,8 +223,7 @@ pub fn recent_files() -> Vec<RecentFile> {
 pub fn recent_open(path: String) -> Result<(), String> {
     let dir = recent_dir().ok_or("no Recent folder")?;
     let p = PathBuf::from(&path);
-    let ok = p.parent().is_some_and(|d| d == dir) && p.extension().is_some_and(|e| e.eq_ignore_ascii_case("lnk")) && p.is_file();
-    if !ok {
+    if !is_safe_recent_shortcut(&p, &dir) || !p.is_file() {
         return Err("not a recent file".into());
     }
     std::process::Command::new("explorer.exe")
@@ -185,17 +238,17 @@ pub fn recent_open(path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn journal_append(app: tauri::AppHandle, text: String) -> Result<String, String> {
     use std::io::Write;
+    let entry = sanitize_journal_entry(&text).ok_or("empty journal entry")?;
     let inbox = crate::live::capture::inbox_path(&app)?;
     let path = inbox.with_file_name("journal.md");
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
-    let text: String = text.chars().take(8000).collect();
     std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(&path)
-        .and_then(|mut f| f.write_all(format!("{}\n\n", text.trim_end()).as_bytes()))
+        .and_then(|mut f| f.write_all(format!("{entry}\n\n").as_bytes()))
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
     Ok(path.to_string_lossy().into_owned())
 }
