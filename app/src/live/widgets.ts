@@ -8,23 +8,18 @@ import { h, svg, clear } from "../views/dom";
 import { ICONS } from "../views/icons";
 import type { ViewActions } from "../views/views";
 import { Live, fmtAgo, fmtBytes, fmtClock, fmtHM, fmtTime, fmtUntil } from "./store";
+import {
+  DEFAULT_HOME_WIDGETS,
+  WIDGET_LABELS,
+  clampMeterPercent,
+  clampProgressPercent,
+  meterColorToken,
+  resolveHomeWidgets,
+  safeCssArtUrl,
+  type WidgetKind,
+} from "./widgets-utils";
 
-export type WidgetKind = "media" | "calendar" | "timer" | "system" | "files" | "notifs" | "clips" | "inbox" | "screen" | "integrations";
-
-export const WIDGET_LABELS: Record<WidgetKind, string> = {
-  media: "Now playing",
-  calendar: "Next event",
-  timer: "Timer",
-  system: "System",
-  files: "Downloads & renders",
-  notifs: "Latest notification",
-  clips: "Last copied",
-  inbox: "Inbox tasks",
-  screen: "Screen time",
-  integrations: "Integrations (pills)",
-};
-
-export const DEFAULT_HOME_WIDGETS: WidgetKind[] = ["media", "calendar", "integrations"];
+export { DEFAULT_HOME_WIDGETS, WIDGET_LABELS, type WidgetKind };
 
 export interface Widget {
   el: HTMLElement;
@@ -97,8 +92,9 @@ function buildMedia(actions: ViewActions): Widget {
       eq.classList.toggle("on", m.playing);
       if (m.art !== artSrc) {
         artSrc = m.art;
-        art.style.backgroundImage = m.art ? `url("${m.art}")` : "";
-        art.replaceChildren(...(m.art ? [] : [svg(ICONS.music, 15)]));
+        const cssUrl = safeCssArtUrl(m.art);
+        art.style.backgroundImage = cssUrl;
+        art.replaceChildren(...(cssUrl ? [] : [svg(ICONS.music, 15)]));
       }
       if (m.playing !== playing) {
         playing = m.playing;
@@ -178,8 +174,8 @@ function bar(label: string): { el: HTMLElement; set(p: number | null, t: string)
     set(p, t) {
       el.style.display = p == null ? "none" : "";
       if (p == null) return;
-      fill.style.width = `${Math.max(2, Math.min(100, p))}%`;
-      fill.style.background = p >= 90 ? "var(--red)" : p >= 70 ? "var(--amber)" : "var(--green-2)";
+      fill.style.width = `${clampMeterPercent(p)}%`;
+      fill.style.background = meterColorToken(p);
       v.textContent = t;
     },
   };
@@ -221,7 +217,7 @@ function buildFiles(actions: ViewActions): Widget {
       }
       a.textContent = items.length > 1 ? `${f.name} +${items.length - 1}` : f.name;
       b.textContent = `${fmtBytes(f.bytes)} · ${fmtBytes(f.speed)}/s`;
-      (track.firstElementChild as HTMLElement).style.width = f.totalBytes ? `${(f.bytes / f.totalBytes) * 100}%` : "";
+      (track.firstElementChild as HTMLElement).style.width = f.totalBytes ? `${clampProgressPercent(f.bytes, f.totalBytes)}%` : "";
     },
   };
 }
@@ -318,7 +314,5 @@ export function buildWidget(
 
 /** Settings value → valid, de-duplicated list of at most three tiles. */
 export function homeWidgets(): WidgetKind[] {
-  const raw = State.settings.homeWidgets ?? DEFAULT_HOME_WIDGETS;
-  const valid = raw.filter((k): k is WidgetKind => k in WIDGET_LABELS);
-  return [...new Set(valid)].slice(0, 3);
+  return resolveHomeWidgets(State.settings.homeWidgets);
 }
