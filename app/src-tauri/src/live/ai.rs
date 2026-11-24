@@ -252,3 +252,64 @@ pub fn journal_append(app: tauri::AppHandle, text: String) -> Result<String, Str
         .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
     Ok(path.to_string_lossy().into_owned())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn model_name_validation_accepts_tags_and_rejects_injection() {
+        assert!(is_valid_model_name("llama3.2:latest"));
+        assert!(is_valid_model_name("  qwen2.5-coder:7b  "));
+        assert!(is_valid_model_name("hf.co/org/model_v1:q4"));
+        assert!(!is_valid_model_name(""));
+        assert!(!is_valid_model_name("   "));
+        assert!(!is_valid_model_name("llama3; rm -rf /"));
+        assert!(!is_valid_model_name("model\nname"));
+        assert!(!is_valid_model_name(&"a".repeat(MAX_MODEL_LEN + 1)));
+    }
+
+    #[test]
+    fn validate_chat_request_enforces_bounds() {
+        assert_eq!(
+            validate_chat_request(" llama3:8b ", "system", "hello").unwrap(),
+            "llama3:8b"
+        );
+        assert!(validate_chat_request("bad model!", "sys", "hi").is_err());
+        assert!(validate_chat_request("llama3", &"s".repeat(MAX_SYSTEM_LEN + 1), "hi").is_err());
+        assert!(validate_chat_request("llama3", "sys", "   ").is_err());
+        assert!(validate_chat_request("llama3", "sys", &"p".repeat(MAX_PROMPT_LEN + 1)).is_err());
+    }
+
+    #[test]
+    fn strip_think_tags_removes_reasoning_prefix() {
+        assert_eq!(
+            strip_think_tags("<think>step 1\nstep 2</think>\nFinal answer."),
+            "Final answer."
+        );
+        assert_eq!(strip_think_tags("  Plain response  "), "Plain response");
+        assert_eq!(strip_think_tags("<think>a</think>mid</think>  end "), "end");
+    }
+
+    #[test]
+    fn is_safe_recent_shortcut_blocks_traversal_and_non_lnk() {
+        let dir = Path::new(r"C:\Users\Test\AppData\Roaming\Microsoft\Windows\Recent");
+        assert!(is_safe_recent_shortcut(&dir.join("notes.txt.lnk"), dir));
+        assert!(is_safe_recent_shortcut(&dir.join("notes.LNK"), dir));
+        assert!(!is_safe_recent_shortcut(&dir.join("notes.exe"), dir));
+        assert!(!is_safe_recent_shortcut(&dir.join(r"..\Desktop\notes.lnk"), dir));
+        assert!(!is_safe_recent_shortcut(Path::new(r"C:\Windows\System32\cmd.lnk"), dir));
+    }
+
+    #[test]
+    fn sanitize_journal_entry_trims_and_rejects_blank() {
+        assert_eq!(sanitize_journal_entry("   \n\t "), None);
+        assert_eq!(
+            sanitize_journal_entry("  Daily note  \n"),
+            Some("Daily note".to_string())
+        );
+        let long = "x".repeat(MAX_JOURNAL_CHARS + 50);
+        assert_eq!(sanitize_journal_entry(&long).unwrap().len(), MAX_JOURNAL_CHARS);
+    }
+}
