@@ -791,3 +791,103 @@ fn fmt_value(v: &Value) -> String {
         other => other.to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_n8n_base_validates_scheme_and_trims_slashes() {
+        assert_eq!(
+            sanitize_n8n_base("  https://n8n.example.com/// "),
+            Some("https://n8n.example.com".into())
+        );
+        assert_eq!(
+            sanitize_n8n_base("http://localhost:5678/"),
+            Some("http://localhost:5678".into())
+        );
+        assert_eq!(sanitize_n8n_base("file:///etc/passwd"), None);
+        assert_eq!(sanitize_n8n_base("javascript:alert(1)"), None);
+        assert_eq!(sanitize_n8n_base("not a url"), None);
+    }
+
+    #[test]
+    fn is_safe_execution_id_rejects_traversal_and_queries() {
+        assert!(is_safe_execution_id("12345"));
+        assert!(is_safe_execution_id("exec_abc-99"));
+        assert!(!is_safe_execution_id(""));
+        assert!(!is_safe_execution_id("../admin"));
+        assert!(!is_safe_execution_id("123?foo=bar"));
+        assert!(!is_safe_execution_id("123#frag"));
+        assert!(!is_safe_execution_id(&"a".repeat(65)));
+    }
+
+    #[test]
+    fn status_error_formats_known_and_generic_codes() {
+        assert_eq!(status_error(401, "No scope"), "Invalid API key (401)");
+        assert_eq!(status_error(403, "No scope"), "No scope");
+        assert_eq!(status_error(502, "No scope"), "API error 502");
+    }
+
+    #[test]
+    fn parse_notion_page_extracts_database_and_page_titles() {
+        let db = json!({
+            "id": "db-1",
+            "object": "database",
+            "title": [{ "plain_text": "Roadmap" }],
+            "url": "https://notion.so/db-1",
+            "last_edited_time": "2026-11-24T00:00:00Z"
+        });
+        let parsed = parse_notion_page(&db).unwrap();
+        assert_eq!(parsed["title"], "Roadmap");
+        assert_eq!(parsed["id"], "db-1");
+
+        let page = json!({
+            "id": "pg-2",
+            "object": "page",
+            "properties": {
+                "Name": { "type": "title", "title": [{ "plain_text": "Sprint Notes" }] }
+            },
+            "url": "https://notion.so/pg-2",
+            "last_edited_time": "2026-11-24T01:00:00Z"
+        });
+        let parsed_page = parse_notion_page(&page).unwrap();
+        assert_eq!(parsed_page["title"], "Sprint Notes");
+    }
+
+    #[test]
+    fn n8n_detail_formats_success_and_error_payloads() {
+        let err_json = json!({
+            "data": {
+                "resultData": {
+                    "error": { "message": "HTTP 500", "node": { "name": "Webhook" } }
+                }
+            }
+        });
+        assert_eq!(n8n_detail(&err_json, false), Some("Webhook\nHTTP 500".into()));
+
+        let ok_json = json!({
+            "data": {
+                "resultData": {
+                    "lastNodeExecuted": "Slack",
+                    "runData": {
+                        "Slack": [{
+                            "data": { "main": [[{ "json": { "channel": "#ops" } }]] }
+                        }]
+                    }
+                }
+            }
+        });
+        let detail = n8n_detail(&ok_json, true).unwrap();
+        assert!(detail.starts_with("→ Slack · 1 item"));
+        assert!(detail.contains("channel: #ops"));
+    }
+
+    #[test]
+    fn fmt_value_bounds_strings_and_summarizes_containers() {
+        assert_eq!(fmt_value(&json!("a".repeat(80))).len(), 50);
+        assert_eq!(fmt_value(&json!([1, 2, 3])), "[3]");
+        assert_eq!(fmt_value(&json!({"a": 1})), "{…}");
+        assert_eq!(fmt_value(&json!(42)), "42");
+    }
+}
