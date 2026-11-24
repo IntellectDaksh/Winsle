@@ -105,3 +105,37 @@ pub async fn lyrics_get(artist: String, title: String, album: String, duration: 
         .map_err(|e| e.to_string())?;
     Ok(pick_synced_lyrics(found))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_query_field_strips_control_chars_and_bounds_len() {
+        assert_eq!(sanitize_query_field("  Daft Punk\r\n "), "Daft Punk");
+        assert_eq!(sanitize_query_field("\x00\x07"), "");
+        let long = "a".repeat(MAX_FIELD_LEN + 40);
+        assert_eq!(sanitize_query_field(&long).len(), MAX_FIELD_LEN);
+    }
+
+    #[test]
+    fn sanitize_duration_secs_rejects_non_finite_and_out_of_range() {
+        assert_eq!(sanitize_duration_secs(214.6), Some(215));
+        assert_eq!(sanitize_duration_secs(0.0), None);
+        assert_eq!(sanitize_duration_secs(-12.0), None);
+        assert_eq!(sanitize_duration_secs(f64::NAN), None);
+        assert_eq!(sanitize_duration_secs(f64::INFINITY), None);
+        assert_eq!(sanitize_duration_secs(MAX_DURATION_SECS + 1.0), None);
+    }
+
+    #[test]
+    fn pick_synced_lyrics_skips_instrumental_blank_and_oversized() {
+        let tracks = vec![
+            Track { synced_lyrics: Some("[00:01.00] inst".into()), instrumental: true },
+            Track { synced_lyrics: Some("   \n  ".into()), instrumental: false },
+            Track { synced_lyrics: Some("x".repeat(MAX_LYRICS_LEN + 1)), instrumental: false },
+            Track { synced_lyrics: Some("  [00:10.00] Hello world  ".into()), instrumental: false },
+        ];
+        assert_eq!(pick_synced_lyrics(tracks), Some("[00:10.00] Hello world".into()));
+    }
+}
