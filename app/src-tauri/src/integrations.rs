@@ -45,11 +45,33 @@ fn emit(app: &AppHandle, update: IntegrationUpdate) {
     let _ = app.emit_to(WINDOW_LABEL, "integration", update);
 }
 
-fn client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .timeout(TIMEOUT)
-        .build()
-        .unwrap_or_default()
+fn client() -> &'static reqwest::Client {
+    static C: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    C.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(TIMEOUT)
+            .build()
+            .unwrap_or_default()
+    })
+}
+
+/// Validates and normalizes a user-configured n8n base URL (http/https with host only).
+pub(crate) fn sanitize_n8n_base(raw: &str) -> Option<String> {
+    let trimmed = raw.trim().trim_end_matches('/');
+    let parsed = tauri::Url::parse(trimmed).ok()?;
+    if !matches!(parsed.scheme(), "http" | "https") || !parsed.has_host() {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
+/// Ensures an execution id from n8n cannot inject path traversal or query params into detail URLs.
+pub(crate) fn is_safe_execution_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
 }
 
 /// Set from the tray's Pause item. While it is on, nothing reaches the network:
@@ -611,7 +633,10 @@ async fn poll_n8n(app: AppHandle) {
     let (Some(key), Some(raw_base)) = (secrets::get("n8n-api-key"), secrets::get("n8n-url")) else {
         return;
     };
-    let base = raw_base.trim_end_matches('/').to_string();
+    let Some(base) = sanitize_n8n_base(&raw_base) else {
+        log::line("n8n: ignoring invalid base URL");
+        return;
+    };
     let http = client();
 
     // Same two shapes as the Swift poller: the public API first, then /rest.
@@ -648,6 +673,9 @@ async fn poll_n8n(app: AppHandle) {
         Some(Value::Number(n)) => n.to_string(),
         _ => return,
     };
+    if !is_safe_execution_id(&id) {
+        return;
+    }
 
     let status = first.get("status").and_then(Value::as_str).unwrap_or("");
     if !["success", "error", "crashed", "canceled", "failed"].contains(&status) {
