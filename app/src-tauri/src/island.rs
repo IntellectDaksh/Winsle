@@ -505,3 +505,53 @@ pub fn set_memory_low(win: &WebviewWindow, low: bool) {
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn island_rect_sanitized_clamps_negative_and_non_finite() {
+        let r = IslandRect { x: f64::NAN, y: f64::INFINITY, w: -50.0, h: -10.0 }.sanitized();
+        assert_eq!(r, IslandRect { x: 0.0, y: 0.0, w: 0.0, h: 0.0 });
+        let ok = IslandRect { x: 100.0, y: 0.0, w: 288.0, h: 38.0 }.sanitized();
+        assert_eq!(ok, IslandRect { x: 100.0, y: 0.0, w: 288.0, h: 38.0 });
+    }
+
+    #[test]
+    fn island_rect_contains_with_margin_checks_bounds_and_nan() {
+        let r = IslandRect { x: 200.0, y: 0.0, w: 300.0, h: 40.0 };
+        assert!(r.contains_with_margin(200.0, 0.0, 14.0));
+        assert!(r.contains_with_margin(186.0, 54.0, 14.0));
+        assert!(!r.contains_with_margin(185.0, 20.0, 14.0));
+        assert!(!r.contains_with_margin(f64::NAN, 10.0, 14.0));
+
+        let empty = IslandRect { x: 10.0, y: 10.0, w: 100.0, h: 0.0 };
+        assert!(!empty.contains_with_margin(50.0, 10.0, 14.0));
+    }
+
+    #[test]
+    fn safe_scale_clamps_and_handles_invalid_values() {
+        assert_eq!(safe_scale(1.5), 1.5);
+        assert_eq!(safe_scale(0.1), 0.5);
+        assert_eq!(safe_scale(10.0), 4.0);
+        assert_eq!(safe_scale(0.0), 1.0);
+        assert_eq!(safe_scale(-2.0), 1.0);
+        assert_eq!(safe_scale(f64::NAN), 1.0);
+    }
+
+    #[test]
+    fn compute_window_geometry_centers_horizontally_for_collapsed_and_expanded() {
+        // 1920px wide monitor at 1.0x scale: expanded 720x320 -> x = (1920 - 720)/2 = 600
+        assert_eq!(compute_window_geometry(0, 0, 1920, 1.0, false), (600, 0, 720, 320));
+        // Collapsed 240x6 at 1.5x scale -> 360x9 -> x = -1920 + (1920 - 360)/2 = -1140
+        assert_eq!(compute_window_geometry(-1920, 0, 1920, 1.5, true), (-1140, 0, 360, 9));
+    }
+
+    #[test]
+    fn poll_gate_set_rect_sanitizes_input() {
+        let gate = PollGate::new();
+        gate.set_rect(IslandRect { x: 10.0, y: 0.0, w: -5.0, h: f64::NAN });
+        assert_eq!(*gate.rect.lock().unwrap(), IslandRect { x: 10.0, y: 0.0, w: 0.0, h: 0.0 });
+    }
+}
